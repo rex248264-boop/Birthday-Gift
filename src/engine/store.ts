@@ -35,6 +35,13 @@ export interface GameState {
   audioUnlocked: boolean;
   fontScale: FontScale;
 
+  /**
+   * Bumped whenever an asset (background/transition) is re-uploaded from the
+   * dev panel. Components that resolve assets read this and append it as a
+   * cache-buster to invalidate the browser cache + force a re-resolve.
+   */
+  assetRefreshNonce: number;
+
   setPhase: (p: AppPhase) => void;
   setFontScale: (scale: FontScale) => void;
   startNewGame: (sceneId?: string) => void;
@@ -49,6 +56,7 @@ export interface GameState {
   toggleDevPanel: () => void;
   unlockAudio: () => void;
   reloadScript: () => void;
+  bumpAssetRefresh: () => void;
 }
 
 const initial = loadAllScripts();
@@ -74,6 +82,7 @@ export const useGame = create<GameState>()(
       showDevPanel: false,
       audioUnlocked: false,
       fontScale: 'md',
+      assetRefreshNonce: 0,
 
       setPhase: (p) => set({ phase: p }),
       setFontScale: (scale) => set({ fontScale: scale }),
@@ -211,6 +220,8 @@ export const useGame = create<GameState>()(
         const { script, diagnostics } = loadAllScripts();
         set({ script, diagnostics, scriptVersion: Date.now() });
       },
+
+      bumpAssetRefresh: () => set((s) => ({ assetRefreshNonce: s.assetRefreshNonce + 1 })),
     }),
     {
       name: 'xiangjianni-save',

@@ -75,8 +75,13 @@ export function parseSceneFile(filePath: string, rawText: string): Scene {
 }
 
 function assignMeta(meta: SceneMeta, key: string, value: string) {
-  if (/上游/.test(key)) meta.upstream = value;
-  else if (/下游/.test(key)) meta.downstream = value;
+  // NOTE: upstream/downstream are single-value fields and must use exact-key
+  // matching. Loose substring matching (e.g. /下游/) would let auxiliary keys
+  // such as "下游说明" silently overwrite the canonical "下游出口" value,
+  // which broke S06b → S07 navigation by leaving "S06b ..." as the first
+  // SXX token in meta.downstream and looping the player back to S06b.
+  if (/^上游(来源)?$/.test(key)) meta.upstream = value;
+  else if (/^下游(出口)?$/.test(key)) meta.downstream = value;
   else if (/画面数/.test(key)) meta.frameCount = parseInt(value, 10) || undefined;
   else if (/字数/.test(key)) meta.wordsBudget = value;
   else if (/时长/.test(key)) meta.playtimeEstimate = value;

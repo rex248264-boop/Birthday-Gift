@@ -217,17 +217,17 @@
 
 .editTextarea {
   width: 100%;
-  min-height: 180px;
-  max-height: 420px;
+  min-height: 360px;
+  max-height: 70vh;
   resize: vertical;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 215, 165, 0.22);
   border-radius: 6px;
   color: rgba(255, 245, 230, 0.92);
   font-family: ui-monospace, SFMono-Regular, monospace;
-  font-size: 11px;
-  line-height: 1.55;
-  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 10px 12px;
   box-sizing: border-box;
   outline: none;
   caret-color: rgba(255, 215, 165, 0.9);
@@ -479,4 +479,109 @@
   padding: 8px 10px;
   box-sizing: border-box;
   outline: none;
+}
+
+/* ── 素材上传 ── */
+.uploadSlot {
+  margin-top: 10px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 215, 165, 0.18);
+  border-radius: 6px;
+}
+
+.uploadSlot + .uploadSlot {
+  margin-top: 8px;
+}
+
+.uploadLabel {
+  font-size: 12px;
+  color: rgba(255, 245, 230, 0.92);
+  margin-bottom: 4px;
+}
+
+.uploadHint {
+  font-size: 10px;
+  line-height: 1.5;
+  color: rgba(255, 215, 165, 0.55);
+  margin-bottom: 6px;
+}
+
+.uploadTarget {
+  font-size: 10px;
+  color: rgba(255, 215, 165, 0.65);
+  margin-bottom: 8px;
+  word-break: break-all;
+}
+
+.uploadTarget code {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: rgba(255, 235, 200, 0.95);
+}
+
+.uploadActions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.uploadBtn {
+  font-family: inherit;
+  font-size: 11px;
+  padding: 5px 14px;
+  background: rgba(255, 215, 165, 0.14);
+  border: 1px solid rgba(255, 215, 165, 0.4);
+  border-radius: 6px;
+  color: rgba(255, 245, 230, 0.9);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.uploadBtn:hover:not(:disabled) {
+  background: rgba(255, 215, 165, 0.24);
+}
+
+.uploadBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.uploadStatusOk {
+  margin-top: 8px;
+  padding: 6px 8px;
+  font-size: 10.5px;
+  line-height: 1.55;
+  background: rgba(100, 200, 90, 0.1);
+  border: 1px solid rgba(140, 220, 130, 0.4);
+  border-radius: 5px;
+  color: rgba(180, 240, 170, 0.95);
+  word-break: break-all;
+}
+
+.uploadStatusOk code {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.uploadDeleted {
+  margin-top: 4px;
+  font-size: 10px;
+  color: rgba(255, 200, 140, 0.7);
+}
+
+.uploadStatusErr {
+  margin-top: 8px;
+  padding: 6px 8px;
+  font-size: 10.5px;
+  line-height: 1.55;
+  background: rgba(200, 60, 40, 0.12);
+  border: 1px solid rgba(255, 120, 100, 0.45);
+  border-radius: 5px;
+  color: rgba(255, 160, 140, 0.95);
+  word-break: break-all;
 }

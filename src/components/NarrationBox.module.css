@@ -1,14 +1,15 @@
 /**
- * NarrationBox shares the bottom slot with DialogueBox — only one renders at
- * a time (see FrameView). Positioning here mirrors DialogueBox so the handoff
- * between旁白 and 对话 happens in place.
+ * NarrationBox is centered on screen. Unlike DialogueBox (which sits in the
+ * bottom slot), narration takes the visual center to draw the player's full
+ * attention before dialogue takes over the bottom slot.
  */
 .root {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: calc(env(safe-area-inset-bottom) + var(--space-7));
+  top: 50%;
   margin-inline: auto;
+  transform: translateY(-50%);
   width: min(700px, calc(100% - var(--space-4)));
   aspect-ratio: 1024 / 323;
   min-height: 120px;

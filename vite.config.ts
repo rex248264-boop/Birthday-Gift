@@ -23,6 +23,163 @@ function rawMarkdownPlugin() {
   };
 }
 
+// Dev-only plugin: expose POST /dev/upload-asset to save an uploaded background or
+// transition file into public/assets/, named by the current scene/frame.
+//
+// Request:
+//   POST /dev/upload-asset?kind=bg|transition&sceneId=S01&frameId=1.3&ext=mp4
+//   Body: raw binary bytes of the file (octet-stream)
+//
+// Behaviour:
+//   - Validates kind / ext against an allow-list.
+//   - Deletes any existing siblings with the SAME stem but a different extension
+//     (e.g. uploading S01-1.3.png will delete S01-1.3.mp4) so the resolver isn't
+//     confused by a stale companion file.
+//   - Writes the new file to:
+//       bg          → public/assets/bg/{sceneId}-{frameId}.{ext}
+//       transition  → public/assets/transitions/{sceneId}-{frameId}.{ext}
+function uploadAssetPlugin() {
+  const ALLOWED_BG_EXTS = new Set(['png', 'jpg', 'jpeg', 'webp', 'mp4', 'webm']);
+  const ALLOWED_TRANSITION_EXTS = new Set(['mp4', 'webm']);
+  const ALLOWED_SCENE_SWITCH_EXTS = new Set(['png', 'jpg', 'jpeg', 'webp']);
+  const ALL_BG_EXTS = ['png', 'jpg', 'jpeg', 'webp', 'mp4', 'webm'];
+  const ALL_TRANSITION_EXTS = ['mp4', 'webm'];
+  const ALL_SCENE_SWITCH_EXTS = ['png', 'jpg', 'jpeg', 'webp'];
+
+  return {
+    name: 'upload-asset',
+    apply: 'serve' as const,
+    configureServer(server: {
+      middlewares: { use: (path: string, handler: (req: IncomingMessage, res: ServerResponse) => void) => void };
+      config: { root: string };
+    }) {
+      server.middlewares.use('/dev/upload-asset', (req, res) => {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        if (req.method !== 'POST') {
+          res.statusCode = 405;
+          res.end();
+          return;
+        }
+        try {
+          const url = new URL(req.url ?? '', 'http://x');
+          const kind = url.searchParams.get('kind');
+          const sceneId = url.searchParams.get('sceneId');
+          const frameId = url.searchParams.get('frameId');
+          const extRaw = (url.searchParams.get('ext') ?? '').toLowerCase().replace(/^\./, '');
+          const swIndexRaw = url.searchParams.get('swIndex');
+
+          if (!sceneId || !frameId || !extRaw) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'Missing sceneId / frameId / ext' }));
+            return;
+          }
+          // Defensive: only allow safe characters in IDs (no path traversal).
+          if (!/^[A-Za-z0-9._-]+$/.test(sceneId) || !/^[A-Za-z0-9._-]+$/.test(frameId)) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'Invalid sceneId / frameId' }));
+            return;
+          }
+
+          let folder: string;
+          let allExtsToSweep: string[];
+          let stem: string;
+          if (kind === 'bg') {
+            if (!ALLOWED_BG_EXTS.has(extRaw)) {
+              res.statusCode = 415;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: `bg 不支持扩展名: ${extRaw}` }));
+              return;
+            }
+            folder = 'bg';
+            allExtsToSweep = ALL_BG_EXTS;
+            stem = `${sceneId}-${frameId}`;
+          } else if (kind === 'transition') {
+            if (!ALLOWED_TRANSITION_EXTS.has(extRaw)) {
+              res.statusCode = 415;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: `transition 仅支持 mp4/webm，收到 ${extRaw}` }));
+              return;
+            }
+            folder = 'transitions';
+            allExtsToSweep = ALL_TRANSITION_EXTS;
+            stem = `${sceneId}-${frameId}`;
+          } else if (kind === 'scene-switch') {
+            if (!ALLOWED_SCENE_SWITCH_EXTS.has(extRaw)) {
+              res.statusCode = 415;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: `scene-switch 仅支持图片(png/jpg/webp)，收到 ${extRaw}` }));
+              return;
+            }
+            const swIndex = swIndexRaw ? Number(swIndexRaw) : NaN;
+            if (!Number.isInteger(swIndex) || swIndex < 1) {
+              res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: `scene-switch 需要正整数 swIndex，收到 ${swIndexRaw}` }));
+              return;
+            }
+            folder = 'scene-switches';
+            allExtsToSweep = ALL_SCENE_SWITCH_EXTS;
+            stem = `${sceneId}-${frameId}-sw${swIndex}`;
+          } else {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: `unknown kind: ${kind}` }));
+            return;
+          }
+
+          const dir = path.join(server.config.root, 'public', 'assets', folder);
+          fs.mkdirSync(dir, { recursive: true });
+
+          const chunks: Buffer[] = [];
+          req.on('data', (chunk: Buffer) => { chunks.push(chunk); });
+          req.on('end', async () => {
+            try {
+              const buf = Buffer.concat(chunks);
+              if (buf.length === 0) {
+                res.statusCode = 400;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ error: 'Empty file' }));
+                return;
+              }
+
+              // Sweep: delete any sibling with the same stem but different ext.
+              const deleted: string[] = [];
+              for (const e of allExtsToSweep) {
+                const sibling = path.join(dir, `${stem}.${e}`);
+                if (fs.existsSync(sibling) && e !== extRaw) {
+                  await fs.promises.unlink(sibling);
+                  deleted.push(`${stem}.${e}`);
+                }
+              }
+
+              const finalPath = path.join(dir, `${stem}.${extRaw}`);
+              await fs.promises.writeFile(finalPath, buf);
+
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({
+                ok: true,
+                savedAs: `public/assets/${folder}/${stem}.${extRaw}`,
+                bytes: buf.length,
+                deleted,
+              }));
+            } catch (e) {
+              res.statusCode = 500;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: String(e) }));
+            }
+          });
+        } catch (e) {
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: String(e) }));
+        }
+      });
+    },
+  };
+}
+
 // Dev-only plugin: expose POST /dev/patch-text to overwrite text in a script file.
 // Only active during `vite dev`; not included in production builds.
 function patchTextPlugin() {
@@ -72,7 +229,7 @@ function patchTextPlugin() {
 }
 
 export default defineConfig({
-  plugins: [react(), rawMarkdownPlugin(), patchTextPlugin()],
+  plugins: [react(), rawMarkdownPlugin(), patchTextPlugin(), uploadAssetPlugin()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),

@@ -75,9 +75,31 @@ export type SceneSwitchItem = {
   kind: 'scene-switch';
   description: string;
   hints: AssetHints;
+  /**
+   * 1-based 序号，由 parseFrame 在解析后按文档顺序统一编号——包含 frame 顶层
+   * 的 scene-switch 以及每个 choice 的所有 option.branchLines 中的 scene-switch
+   * （按 letter 顺序遍历 option）。这一序号用于把上传的素材文件名与该 switch
+   * 绑定，例如 `public/assets/scene-switches/{sceneId}-{frameId}-sw{swIndex}.{ext}`。
+   * 不论玩家最终选择哪一条分支，每个 switch 的 swIndex 都是稳定的。
+   */
+  swIndex?: number;
 };
 
-export type DialogueItem = DialogueLine | ChoiceBlock | TextInputBlock | SceneSwitchItem;
+/**
+ * Narration block emitted as an inline item in the dialogue stream.
+ *
+ * 一帧内可以出现多个 `### 背景旁白` 段，它们会被按文档顺序、与 `### 对话`
+ * 段交错地拼接进同一个 items 序列里——例如「旁白 A → 对话若干 → 旁白 B」。
+ * 渲染时由 FrameView 在当前 item 为 narration 时显示 NarrationBox，
+ * 玩家点击翻页/翻完后再 advance 到下一个 item。
+ */
+export type NarrationItem = {
+  kind: 'narration';
+  lines: string[];
+  hints: AssetHints;
+};
+
+export type DialogueItem = DialogueLine | ChoiceBlock | TextInputBlock | SceneSwitchItem | NarrationItem;
 
 export type DialogueSection = {
   items: DialogueItem[];

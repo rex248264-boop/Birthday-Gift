@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Frame } from '@/parser';
 import { tapAdvance, currentScene, getEffectiveItems, submitTextInput } from '@/engine';
-import { SceneBackground } from './SceneBackground';
+import { SceneBackground, type BgOverride } from './SceneBackground';
 import { Character } from './Character';
 import { MicroEffect } from './MicroEffect';
 import { NarrationBox } from './NarrationBox';
@@ -13,7 +13,11 @@ import { VideoTransition } from './VideoTransition';
 import { TopBar } from './TopBar';
 import { BottomControls } from './BottomControls';
 import { useGame } from '@/engine';
-import { resolveTransitionVideo, pickFirstExisting } from '@/engine/assetResolver';
+import {
+  resolveTransitionVideo,
+  resolveSceneSwitchImage,
+  pickFirstExisting,
+} from '@/engine/assetResolver';
 import { audio } from '@/audio/audioManager';
 import styles from './FrameView.module.css';
 
@@ -38,49 +42,102 @@ export function FrameView({ sceneId, frame }: Props) {
 
   const currentItem = items[dialogueIdx];
 
-  // Narration and dialogue share the bottom slot. Narration plays first; once
-  // the player advances past its last page, `narrationDismissed` flips and
-  // dialogue takes over the same spot — they never coexist on screen.
-  //
+  // 旁白被解析为 items 流里的 `kind: 'narration'` 项，与对话行交错。当
+  // currentItem 是 narration 时显示 NarrationBox，玩家点击屏幕翻页；翻完最
+  // 后一页后再点击会 advance 到下一个 item（可能是对话行、也可能是另一段旁
+  // 白——这样「旁白 → 对话 → 旁白」会严格按文档顺序播放）。
   // 每次点击翻一"页"（NARRATION_PAGE_SIZE 行），整页替换，不逐行累积。
   const NARRATION_PAGE_SIZE = 3;
   const [narrationPage, setNarrationPage] = useState(0); // 当前页起始行索引
-  const [narrationDismissed, setNarrationDismissed] = useState(false);
   const [transitionVisible, setTransitionVisible] = useState(false);
-  const [bgOverride, setBgOverride] = useState<string | null>(null);
+  const [bgOverride, setBgOverride] = useState<BgOverride | null>(null);
   const bgOverrideToggleRef = useRef(false);
 
   // Probe for a transition video keyed to this frame (plays when leaving the frame).
   const [videoTransitionSrc, setVideoTransitionSrc] = useState<string | null>(null);
   const [showVideoTransition, setShowVideoTransition] = useState(false);
+  const assetNonce = useGame((s) => s.assetRefreshNonce);
 
-  const narrationLines = frame.narration?.lines ?? [];
-  const hasNarration = narrationLines.length > 0;
-  const atLastNarrationPage = narrationPage + NARRATION_PAGE_SIZE >= narrationLines.length;
-  const narrationActive = hasNarration && !narrationDismissed;
+  // 预解析本帧 effective items 中所有 scene-switch 的上传素材 URL；当 scene-switch
+  // 真的成为 currentItem 时直接查表使用，避免每次 advance 都触发异步 fetch。
+  const [sceneSwitchUrls, setSceneSwitchUrls] = useState<Map<number, string>>(new Map());
+
+  const narrationItem = currentItem?.kind === 'narration' ? currentItem : null;
+  const narrationLines = narrationItem?.lines ?? [];
+  const atLastNarrationPage =
+    !!narrationItem && narrationPage + NARRATION_PAGE_SIZE >= narrationLines.length;
 
   useEffect(() => {
-    setNarrationPage(0);
-    setNarrationDismissed(false);
     setTransitionVisible(false);
     setBgOverride(null);
     bgOverrideToggleRef.current = false;
-    setVideoTransitionSrc(null);
-    setShowVideoTransition(false);
-    // Probe for a transition video for this frame
-    const candidates = resolveTransitionVideo(sceneId, frame.id);
-    pickFirstExisting(candidates).then((url) => setVideoTransitionSrc(url));
   }, [frame.id, sceneId]);
 
-  // Auto-advance past scene-switch items and toggle background between black and white
+  // 切换到新 item 时把旁白的页索引归零；保证每段独立旁白都从第一页开始。
   useEffect(() => {
-    if (currentItem?.kind === 'scene-switch') {
-      bgOverrideToggleRef.current = !bgOverrideToggleRef.current;
-      setBgOverride(bgOverrideToggleRef.current ? '#000000' : '#ffffff');
-      tapAdvance();
+    setNarrationPage(0);
+  }, [frame.id, sceneId, dialogueIdx]);
+
+  // Re-probe transition video whenever the frame changes OR an asset is re-uploaded.
+  useEffect(() => {
+    setVideoTransitionSrc(null);
+    setShowVideoTransition(false);
+    const candidates = resolveTransitionVideo(sceneId, frame.id);
+    pickFirstExisting(candidates).then((url) => {
+      setVideoTransitionSrc(url && assetNonce > 0 ? `${url}?v=${assetNonce}` : url);
+    });
+  }, [frame.id, sceneId, assetNonce]);
+
+  // 预解析本帧 effective items 路径上每个 scene-switch 的上传素材 URL。
+  useEffect(() => {
+    let cancelled = false;
+    const switches = items.filter(
+      (it): it is typeof it & { kind: 'scene-switch'; swIndex: number } =>
+        it.kind === 'scene-switch' && typeof it.swIndex === 'number',
+    );
+    if (switches.length === 0) {
+      setSceneSwitchUrls(new Map());
+      return () => {
+        cancelled = true;
+      };
     }
+    Promise.all(
+      switches.map(async (sw) => {
+        const url = await pickFirstExisting(resolveSceneSwitchImage(sceneId, frame.id, sw.swIndex));
+        return { swIndex: sw.swIndex, url };
+      }),
+    ).then((results) => {
+      if (cancelled) return;
+      const map = new Map<number, string>();
+      for (const r of results) {
+        if (r.url) map.set(r.swIndex, assetNonce > 0 ? `${r.url}?v=${assetNonce}` : r.url);
+      }
+      setSceneSwitchUrls(map);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [items, sceneId, frame.id, assetNonce]);
+
+  // Scene-switch 自动播放：若该 switch 有上传素材，用图片覆盖；否则回落到
+  // 黑/白闪烁的占位方案。设置完覆盖后立即 tapAdvance 跳到下一个 item，
+  // 覆盖图会留在屏幕上直到下一次 scene-switch 或换帧。
+  useEffect(() => {
+    if (currentItem?.kind !== 'scene-switch') return;
+    const swIndex = currentItem.swIndex;
+    const uploadedUrl = swIndex != null ? sceneSwitchUrls.get(swIndex) : undefined;
+    if (uploadedUrl) {
+      setBgOverride({ kind: 'image', url: uploadedUrl });
+    } else {
+      bgOverrideToggleRef.current = !bgOverrideToggleRef.current;
+      setBgOverride({
+        kind: 'color',
+        value: bgOverrideToggleRef.current ? '#000000' : '#ffffff',
+      });
+    }
+    tapAdvance();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentItem]);
+  }, [currentItem, sceneSwitchUrls]);
 
   useEffect(() => {
     if (!audioUnlocked) return;
@@ -119,13 +176,16 @@ export function FrameView({ sceneId, frame }: Props) {
     (items.length === 0 || dialogueIdx >= items.length - 1);
 
   const onScreenTap = () => {
-    // Narration advances *first*, even when the upcoming dialogue item is a
-    // choice/input — otherwise the player would be stuck on narration whenever
-    // the next beat is interactive.
-    if (narrationActive) {
+    // 当前 item 是旁白：先翻页，翻到最后一页再点击会 advance 到下一个 item
+    // （这就是「旁白 → 对话 → 旁白」按文档顺序播放的关键）。
+    if (narrationItem) {
       if (atLastNarrationPage) {
-        // Hand off the bottom slot from narration to dialogue.
-        setNarrationDismissed(true);
+        // 若这一段旁白也正好是该帧最后一个 item 且帧绑定了过场视频，先播视频。
+        if (nextTapExitsFrame && videoTransitionSrc && !showVideoTransition) {
+          setShowVideoTransition(true);
+          return;
+        }
+        tapAdvance();
       } else {
         setNarrationPage((p) => p + NARRATION_PAGE_SIZE);
       }
@@ -187,17 +247,22 @@ export function FrameView({ sceneId, frame }: Props) {
       <Character
         speaker={activeSpeaker?.speaker ?? ''}
         action={activeSpeaker?.action}
-        active={!narrationActive && !!activeSpeaker && activeSpeaker.speaker !== '旁白'}
+        active={!!activeSpeaker && activeSpeaker.speaker !== '旁白'}
       />
 
-      {narrationActive && (
-        <NarrationBox lines={narrationLines} pageStart={narrationPage} pageSize={NARRATION_PAGE_SIZE} />
+      {narrationItem && (
+        <NarrationBox
+          key={`narr-${frame.id}-${dialogueIdx}`}
+          lines={narrationItem.lines}
+          pageStart={narrationPage}
+          pageSize={NARRATION_PAGE_SIZE}
+        />
       )}
 
       {!isInteractive && <TopBar contextLabel={sceneTitle} />}
       {!isInteractive && <BottomControls />}
 
-      {!narrationActive && currentItem && currentItem.kind === 'line' && (
+      {currentItem && currentItem.kind === 'line' && (
         <DialogueBox
           key={`${frame.id}-${dialogueIdx}`}
           line={currentItem}
@@ -207,11 +272,11 @@ export function FrameView({ sceneId, frame }: Props) {
         />
       )}
 
-      {!narrationActive && currentItem && currentItem.kind === 'choice' && (
+      {currentItem && currentItem.kind === 'choice' && (
         <ChoiceMenu choice={currentItem} />
       )}
 
-      {!narrationActive && currentItem && currentItem.kind === 'input' && (
+      {currentItem && currentItem.kind === 'input' && (
         <TextInputBox block={currentItem} onConfirm={handleTextInputConfirm} />
       )}
 

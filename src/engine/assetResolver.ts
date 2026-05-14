@@ -136,6 +136,18 @@ export function resolveTransitionVideo(sceneId: string, frameId: string, hint?: 
   return autoExt(base, BG_VIDEO_EXTS);
 }
 
+// Scene-switch overlay image: /assets/scene-switches/{SceneId}-{FrameId}-sw{N}.{ext}
+// 每个 frame 内 scene-switch 都有稳定的 swIndex（含 choice 分支内的），
+// 上传后会作为该 switch 期间的全屏覆盖图取代默认的黑/白闪烁。
+export function resolveSceneSwitchImage(
+  sceneId: string,
+  frameId: string,
+  swIndex: number,
+): string[] {
+  const base = joinUrl('/assets/scene-switches', `${sceneId}-${frameId}-sw${swIndex}`);
+  return autoExt(base, BG_IMAGE_EXTS);
+}
+
 // Map a speaker name to a role folder for sprite resolution.
 export function speakerToRole(speaker: string): string {
   if (speaker === '他' || speaker === '陌生访客' || speaker === '男主') return 'he';

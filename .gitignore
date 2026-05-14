@@ -8,3 +8,9 @@ dist-ssr
 .env
 .env.local
 *.log
+
+# tsc -b artefacts from `npm run build` (vite.config.ts gets emitted as JS;
+# if left around, vite picks the .js over the .ts and ignores plugin edits).
+vite.config.js
+vite.config.d.ts
+*.tsbuildinfo

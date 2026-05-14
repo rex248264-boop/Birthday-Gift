@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   useGame,
   useTextOffsets,
@@ -11,6 +11,7 @@ import {
   type SceneTheme,
   type FontScale,
 } from '@/engine';
+import type { Frame, SceneSwitchItem } from '@/parser';
 import styles from './DevPanel.module.css';
 
 type SaveStatus = 'idle' | 'saving' | 'ok' | 'err' | 'unchanged' | 'notfound';
@@ -133,6 +134,9 @@ export function DevPanel() {
               <span>frame</span> <code>{currentFrameId ?? '—'}</code>
             </div>
           </section>
+
+          {/* ── 素材上传 ── */}
+          <AssetUploadSection sceneId={currentSceneId} frameId={currentFrameId} />
 
           {/* ── 内容编辑器 ── */}
           {editFilePath && (
@@ -472,4 +476,291 @@ function groupSlots() {
     groups[s.group].push(s);
   }
   return groups;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ *  素材上传子面板（背景图/视频 + 过渡视频）
+ * ──────────────────────────────────────────────────────────────────────── */
+
+type UploadStatus =
+  | { state: 'idle' }
+  | { state: 'uploading' }
+  | { state: 'ok'; savedAs: string; bytes: number; deleted: string[] }
+  | { state: 'err'; message: string };
+
+const BG_ACCEPT = 'image/png,image/jpeg,image/webp,video/mp4,video/webm';
+const TRANSITION_ACCEPT = 'video/mp4,video/webm';
+const SCENE_SWITCH_ACCEPT = 'image/png,image/jpeg,image/webp';
+const BG_EXTS = ['png', 'jpg', 'jpeg', 'webp', 'mp4', 'webm'];
+const TRANSITION_EXTS = ['mp4', 'webm'];
+const SCENE_SWITCH_EXTS = ['png', 'jpg', 'jpeg', 'webp'];
+
+type UploadKind = 'bg' | 'transition' | 'scene-switch';
+
+function extOf(filename: string): string {
+  const m = filename.toLowerCase().match(/\.([a-z0-9]+)$/);
+  return m ? m[1] : '';
+}
+
+async function uploadAsset(
+  kind: UploadKind,
+  sceneId: string,
+  frameId: string,
+  file: File,
+  extra?: { swIndex?: number },
+): Promise<UploadStatus> {
+  const ext = extOf(file.name);
+  const allowed =
+    kind === 'bg' ? BG_EXTS : kind === 'transition' ? TRANSITION_EXTS : SCENE_SWITCH_EXTS;
+  if (!allowed.includes(ext === 'jpeg' ? 'jpeg' : ext)) {
+    return { state: 'err', message: `不支持的扩展名 .${ext}（允许: ${allowed.join(', ')}）` };
+  }
+  const params = new URLSearchParams({ kind, sceneId, frameId, ext });
+  if (kind === 'scene-switch' && extra?.swIndex != null) {
+    params.set('swIndex', String(extra.swIndex));
+  }
+  try {
+    const buf = await file.arrayBuffer();
+    const res = await fetch(`/dev/upload-asset?${params.toString()}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: buf,
+    });
+    const data = (await res.json()) as {
+      ok?: boolean;
+      savedAs?: string;
+      bytes?: number;
+      deleted?: string[];
+      error?: string;
+    };
+    if (res.ok && data.ok && data.savedAs) {
+      return {
+        state: 'ok',
+        savedAs: data.savedAs,
+        bytes: data.bytes ?? 0,
+        deleted: data.deleted ?? [],
+      };
+    }
+    return { state: 'err', message: data.error ?? `HTTP ${res.status}` };
+  } catch (e) {
+    return { state: 'err', message: String(e) };
+  }
+}
+
+/**
+ * 把 frame 内所有 scene-switch（含 choice option 分支里的）按 swIndex 升序
+ * 收集到一起，返回每条的索引、显示文字和来源 option（若来自分支）。
+ */
+type SceneSwitchEntry = {
+  swIndex: number;
+  description: string;
+  fromOption?: string; // e.g. 'A' / 'B'
+};
+
+function collectSceneSwitches(frame: Frame | null): SceneSwitchEntry[] {
+  if (!frame?.dialogue) return [];
+  const out: SceneSwitchEntry[] = [];
+  const pushSw = (sw: SceneSwitchItem, fromOption?: string) => {
+    if (sw.swIndex == null) return;
+    out.push({
+      swIndex: sw.swIndex,
+      description: cleanSceneSwitchLabel(sw.description),
+      fromOption,
+    });
+  };
+  for (const it of frame.dialogue.items) {
+    if (it.kind === 'scene-switch') {
+      pushSw(it);
+    } else if (it.kind === 'choice') {
+      for (const opt of it.options) {
+        if (!opt.branchLines) continue;
+        for (const bl of opt.branchLines) {
+          if (bl.kind === 'scene-switch') pushSw(bl, opt.letter);
+        }
+      }
+    }
+  }
+  return out.sort((a, b) => a.swIndex - b.swIndex);
+}
+
+function cleanSceneSwitchLabel(raw: string): string {
+  // 把【画面切换：xxx】里的内层文字抽出来，方便面板显示。
+  const m = raw.match(/^【\s*画面切换\s*[：:]\s*(.+?)\s*】\s*$/);
+  return m ? m[1] : raw;
+}
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function UploadSlot({
+  kind,
+  label,
+  hint,
+  accept,
+  sceneId,
+  frameId,
+  swIndex,
+  targetName: explicitTargetName,
+}: {
+  kind: UploadKind;
+  label: string;
+  hint: string;
+  accept: string;
+  sceneId: string;
+  frameId: string;
+  /** Required when kind === 'scene-switch'. */
+  swIndex?: number;
+  /** Optional override; otherwise computed from sceneId/frameId/(swIndex). */
+  targetName?: string;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [status, setStatus] = useState<UploadStatus>({ state: 'idle' });
+  const bumpAssetRefresh = useGame((s) => s.bumpAssetRefresh);
+
+  // Reset status when frame/scene/index changes.
+  useEffect(() => {
+    setStatus({ state: 'idle' });
+  }, [sceneId, frameId, swIndex]);
+
+  const handlePick = () => {
+    inputRef.current?.click();
+  };
+
+  const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-picking the same file later
+    if (!file) return;
+    setStatus({ state: 'uploading' });
+    const result = await uploadAsset(kind, sceneId, frameId, file, { swIndex });
+    setStatus(result);
+    if (result.state === 'ok') {
+      bumpAssetRefresh();
+    }
+  };
+
+  const stem =
+    kind === 'scene-switch' && swIndex != null
+      ? `${sceneId}-${frameId}-sw${swIndex}`
+      : `${sceneId}-${frameId}`;
+  const targetName =
+    explicitTargetName ??
+    `${stem}.{${accept
+      .split(',')
+      .map((a) => a.split('/')[1])
+      .join('|')}}`;
+
+  return (
+    <div className={styles.uploadSlot}>
+      <div className={styles.uploadLabel}>{label}</div>
+      <div className={styles.uploadHint}>{hint}</div>
+      <div className={styles.uploadTarget}>
+        将保存为 <code>{targetName}</code>
+      </div>
+      <div className={styles.uploadActions}>
+        <button
+          className={styles.uploadBtn}
+          onClick={handlePick}
+          disabled={status.state === 'uploading'}
+        >
+          {status.state === 'uploading' ? '上传中…' : '选择文件并上传'}
+        </button>
+        <input
+          ref={inputRef}
+          type="file"
+          accept={accept}
+          onChange={handleChange}
+          style={{ display: 'none' }}
+        />
+      </div>
+      {status.state === 'ok' && (
+        <div className={styles.uploadStatusOk}>
+          ✓ 已保存 {formatBytes(status.bytes)} → <code>{status.savedAs}</code>
+          {status.deleted.length > 0 && (
+            <div className={styles.uploadDeleted}>
+              覆盖删除：{status.deleted.join('、')}
+            </div>
+          )}
+        </div>
+      )}
+      {status.state === 'err' && (
+        <div className={styles.uploadStatusErr}>✕ {status.message}</div>
+      )}
+    </div>
+  );
+}
+
+function AssetUploadSection({
+  sceneId,
+  frameId,
+}: {
+  sceneId: string | null;
+  frameId: string | null;
+}) {
+  const script = useGame((s) => s.script);
+  const frame = useMemo<Frame | null>(() => {
+    if (!sceneId || !frameId) return null;
+    const scene = script.scenes.get(sceneId);
+    return scene?.frames.find((f) => f.id === frameId) ?? null;
+  }, [sceneId, frameId, script]);
+
+  const sceneSwitches = useMemo(() => collectSceneSwitches(frame), [frame]);
+
+  if (!sceneId || !frameId) {
+    return (
+      <section className={styles.section}>
+        <div className={styles.sectionTitle}>素材上传</div>
+        <div className={styles.muted}>未选中画面，无法上传。</div>
+      </section>
+    );
+  }
+  return (
+    <>
+      <section className={styles.section}>
+        <div className={styles.sectionTitle}>素材上传（当前画面）</div>
+        <UploadSlot
+          kind="bg"
+          label="背景图 / 背景视频"
+          hint="一个文件对应一帧。图片支持 png/jpg/webp；视频支持 mp4/webm（自动循环）。"
+          accept={BG_ACCEPT}
+          sceneId={sceneId}
+          frameId={frameId}
+        />
+        <UploadSlot
+          kind="transition"
+          label="过渡视频（离开本帧时播放）"
+          hint="仅支持 mp4/webm。本帧最后一次点击后播放，结束自动进入下一帧。"
+          accept={TRANSITION_ACCEPT}
+          sceneId={sceneId}
+          frameId={frameId}
+        />
+      </section>
+
+      {sceneSwitches.length > 0 && (
+        <section className={styles.section}>
+          <div className={styles.sectionTitle}>
+            画面切换素材（{sceneSwitches.length}）
+          </div>
+          <div className={styles.uploadHint}>
+            本帧 <code>【画面切换：…】</code> 共 {sceneSwitches.length} 处。每处可单独上传一张图片，
+            会在该 switch 触发时全屏覆盖；未上传的仍保持默认黑/白闪烁。
+          </div>
+          {sceneSwitches.map((sw) => (
+            <UploadSlot
+              key={sw.swIndex}
+              kind="scene-switch"
+              label={`#${sw.swIndex}${sw.fromOption ? `（选项 ${sw.fromOption}）` : ''} · ${sw.description}`}
+              hint="仅支持 png/jpg/webp。会作为该 scene-switch 的全屏覆盖图。"
+              accept={SCENE_SWITCH_ACCEPT}
+              sceneId={sceneId}
+              frameId={frameId}
+              swIndex={sw.swIndex}
+            />
+          ))}
+        </section>
+      )}
+    </>
+  );
 }
