@@ -43,7 +43,7 @@
 }
 
 .option {
-  width: min(700px, calc(100% - var(--space-5)));
+  width: min(780px, calc(100% - var(--space-4)));
   aspect-ratio: 1024 / 167;
   background-image: var(--bg-choice-normal);
   background-size: 100% 100%;
@@ -110,7 +110,7 @@
 
 .confirm {
   /* 资源 choice-confirm.png 为 1672×167（≈10:1），保持原始比例避免压缩变形 */
-  width: min(780px, 92%);
+  width: min(860px, 96%);
   aspect-ratio: 1672 / 167;
   background-image: var(--bg-choice-confirm);
   background-size: 100% 100%;

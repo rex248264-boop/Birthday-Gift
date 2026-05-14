@@ -4,7 +4,7 @@
   right: 0;
   bottom: calc(env(safe-area-inset-bottom) + var(--space-7));
   margin-inline: auto;
-  width: min(580px, calc(100% - var(--space-5)));
+  width: min(660px, calc(100% - var(--space-4)));
   aspect-ratio: 1024 / 425;
   background-image: var(--bg-dialogue);
   background-size: 100% 100%;
@@ -169,6 +169,6 @@
 /* 极窄屏 / 横屏让步 */
 @media (max-height: 600px) {
   .root {
-    width: min(520px, calc(100% - var(--space-5)));
+    width: min(600px, calc(100% - var(--space-4)));
   }
 }
