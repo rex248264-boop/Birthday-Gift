@@ -1,0 +1,142 @@
+/**
+ * 文本输入交互（许愿场合）
+ * 使用通用-旁白背景作为面板底图，里面装提示 + 输入框 + "许完了" 按钮。
+ */
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: calc(env(safe-area-inset-top) + var(--space-5)) var(--space-4)
+    calc(env(safe-area-inset-bottom) + var(--space-5)) var(--space-4);
+  /* 与 ChoiceMenu 一致的轻 vignette：让场景视频仍能透出来 */
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.06) 0%,
+    rgba(0, 0, 0, 0.22) 60%,
+    rgba(0, 0, 0, 0.34) 100%
+  );
+  z-index: 10;
+  pointer-events: auto;
+}
+
+/* 面板：使用通用-背景（旁白）素材，1672×529 ≈ 3.16:1 */
+.box {
+  position: relative;
+  width: min(720px, 94%);
+  aspect-ratio: 1672 / 529;
+  /* 内容比面板高时仍保证有足够空间显示输入框 + 按钮 */
+  min-height: 260px;
+  background-image: var(--bg-narration);
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-color: transparent;
+  /* 装饰边距：留出 PNG 边框的安全区 */
+  padding: 9% 12% 8.5%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 3%;
+  filter: drop-shadow(0 16px 32px var(--state-shadow));
+}
+
+.prompt {
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-serif);
+  font-size: var(--fs-md);
+  color: var(--ink-soft);
+  letter-spacing: 0.06em;
+  line-height: 1.5;
+  font-style: italic;
+  white-space: pre-wrap;
+  text-shadow: 0 1px 0 rgba(255, 250, 240, 0.55);
+}
+
+.input {
+  width: 100%;
+  /* 高度由 padding 撑起 —— 比之前更宽敞，方便长愿望文字显示 */
+  font-family: var(--font-serif);
+  font-size: var(--fs-lg);
+  padding: 16px 18px;
+  background: rgba(255, 248, 225, 0.55);
+  color: var(--ink-deep);
+  border: 1px solid rgba(168, 132, 80, 0.4);
+  border-radius: 4px;
+  outline: none;
+  text-align: center;
+  letter-spacing: 0.04em;
+  line-height: 1.5;
+  caret-color: var(--gold-deep);
+  box-sizing: border-box;
+  transition: background 220ms var(--ease-out-soft),
+    border-color 220ms var(--ease-out-soft);
+}
+
+.input::placeholder {
+  color: rgba(138, 119, 88, 0.5);
+  font-style: italic;
+}
+
+.input:focus {
+  border-color: rgba(168, 132, 80, 0.85);
+  background: rgba(255, 248, 225, 0.78);
+}
+
+/* 「许好了」按钮：复用通用确认按钮素材，保持同一族视觉 */
+.submit {
+  align-self: center;
+  /* 按钮再放大一档；保持图片原始 10:1 比例不变形 */
+  width: min(720px, 100%);
+  aspect-ratio: 1672 / 167;
+  background-image: var(--bg-choice-confirm);
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-color: transparent;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-fancy);
+  font-size: var(--fs-lg);
+  color: var(--ink-name);
+  letter-spacing: 0.12em;
+  padding-left: 0.12em; /* 抵消字距让视觉居中 */
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.58));
+  transition: filter 220ms var(--ease-out-soft),
+    transform 220ms var(--ease-out-soft);
+}
+
+.submit:hover:not(:disabled) {
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.55)) brightness(1.06);
+  transform: scale(1.03);
+}
+
+.submit:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.4)) grayscale(0.2);
+}
+
+/* 极窄屏让步 */
+@media (max-height: 600px) {
+  .box {
+    width: min(560px, 94%);
+    padding: 8% 11% 8%;
+    min-height: 220px;
+  }
+  .prompt {
+    font-size: var(--fs-base);
+  }
+}

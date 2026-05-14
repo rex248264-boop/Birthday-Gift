@@ -1,0 +1,11 @@
+.empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-serif);
+  color: rgba(255, 240, 220, 0.6);
+  padding: 40px;
+  text-align: center;
+}

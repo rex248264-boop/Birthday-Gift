@@ -1,0 +1,175 @@
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: calc(env(safe-area-inset-top) + var(--space-7));
+  padding-bottom: calc(env(safe-area-inset-bottom) + var(--space-7));
+  /* Subtle vignette so the scene video still shows through; no heavy dimming. */
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.05) 0%,
+    rgba(0, 0, 0, 0.18) 60%,
+    rgba(0, 0, 0, 0.28) 100%
+  );
+  z-index: 10;
+  pointer-events: auto;
+}
+
+
+.subPrompt {
+  margin: var(--space-4) var(--space-6) 0;
+  font-family: var(--font-serif);
+  font-size: var(--fs-sm);
+  line-height: 1.7;
+  color: rgba(255, 246, 230, 0.92);
+  text-align: center;
+  letter-spacing: 0.04em;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+  max-width: 480px;
+}
+
+/* ────────── Options ────────── */
+.options {
+  margin-top: auto;
+  margin-bottom: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* 选项之间贴得更近：金边装饰带本身已有内 padding，2px 的视觉间距即可 */
+  gap: 2px;
+  width: 100%;
+}
+
+.option {
+  width: min(700px, calc(100% - var(--space-5)));
+  aspect-ratio: 1024 / 167;
+  background-image: var(--bg-choice-normal);
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-color: transparent;
+  border: none;
+  /* padding-top 3% / padding-bottom 0% → 文本视觉中心下移约 1.5% */
+  padding: 3% 18% 0 14%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-serif);
+  font-size: var(--fs-md);
+  color: var(--ink-deep);
+  letter-spacing: 0.08em;
+  line-height: 1.4;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45));
+  transition: filter 220ms var(--ease-out-soft),
+    transform 220ms var(--ease-out-soft);
+}
+
+.option:hover {
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.5)) brightness(1.06);
+  transform: translateY(-1px);
+}
+
+.option:active {
+  transform: scale(0.985);
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5)) brightness(0.96);
+}
+
+.option.selected {
+  background-image: var(--bg-choice-selected);
+  color: var(--ink-name);
+  font-weight: 500;
+  filter: drop-shadow(0 8px 22px var(--state-glow-gold))
+    drop-shadow(0 0 6px rgba(244, 213, 138, 0.4));
+}
+
+.option.dim {
+  opacity: 0.5;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.4)) grayscale(0.3);
+}
+
+.optionLabel {
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* ────────── Confirm Button ────────── */
+.confirmRow {
+  margin-top: var(--space-5);
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  min-height: 78px; /* reserve space so layout doesn't jump when it appears */
+}
+
+.confirm {
+  /* 资源 choice-confirm.png 为 1672×167（≈10:1），保持原始比例避免压缩变形 */
+  width: min(780px, 92%);
+  aspect-ratio: 1672 / 167;
+  background-image: var(--bg-choice-confirm);
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-color: transparent;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-fancy);
+  font-size: var(--fs-xl);
+  color: var(--ink-name);
+  letter-spacing: 0.4em;
+  padding-left: 0.4em; /* offset for letter-spacing to keep visually centered */
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.55));
+  transition: filter 220ms var(--ease-out-soft),
+    transform 220ms var(--ease-out-soft);
+}
+
+.confirm:hover {
+  filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.55)) brightness(1.08);
+  transform: scale(1.03);
+}
+
+.confirm:active {
+  transform: scale(0.97);
+}
+
+.confirmLabel {
+  display: inline-block;
+  line-height: 1;
+}
+
+/* 赛博主题：深色选项背景改用亮色文字，对齐 DialogueBox */
+:global([data-theme="cyber"]) .option {
+  color: rgba(210, 240, 255, 0.92);
+}
+
+:global([data-theme="cyber"]) .option.selected {
+  color: rgba(180, 240, 255, 0.95);
+}
+
+:global([data-theme="cyber"]) .confirm {
+  color: rgba(210, 240, 255, 0.92);
+}
+
+/* 长 prompt 下让步 */
+@media (max-height: 700px) {
+  .overlay {
+    padding-top: calc(env(safe-area-inset-top) + var(--space-5));
+  }
+  .banner {
+    font-size: var(--fs-base);
+    padding: var(--space-2) var(--space-5);
+  }
+  .options {
+    gap: 1px;
+  }
+}
