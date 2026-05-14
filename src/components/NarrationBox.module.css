@@ -1,8 +1,13 @@
 /**
- * NarrationBox shares the bottom slot with DialogueBox — only one renders at
- * a time (see FrameView). Positioning here mirrors DialogueBox so the handoff
- * between旁白 and 对话 happens in place.
+ * NarrationBox · 自适应高度版（代码绘制纸感面板）
+ *
+ * 与 DialogueBox 共享底部插槽（同一时间只渲染其中一个，见 FrameView）。
+ * 旧版按 1024×323 锁定 aspect-ratio；本版本去掉固定比例，由内容撑开高度。
+ *
+ * - 容器：金边 + 米白纸感 + 圆角，与 DialogueBox 同族但无名牌
+ * - 角饰：左上「飘带/烛影」+ 右下「烛火/花卉」—— CSS sprite 从原 PNG 裁出
  */
+
 .root {
   position: absolute;
   left: 0;
@@ -10,12 +15,13 @@
   bottom: calc(env(safe-area-inset-bottom) + var(--space-7));
   margin-inline: auto;
   width: min(700px, calc(100% - var(--space-4)));
-  aspect-ratio: 1024 / 323;
-  min-height: 120px;
-  background-image: var(--bg-narration);
-  background-size: 100% 100%;
-  background-repeat: no-repeat;
-  padding: 6% 12% 8% 10%;
+  min-height: 130px;
+  max-height: min(50vh, 440px);
+  background: var(--frame-bg);
+  border: var(--frame-border-width) solid var(--frame-border-color);
+  border-radius: var(--frame-radius);
+  box-shadow: var(--frame-inner-stroke), var(--frame-outer-glow);
+  padding: 28px 56px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -23,10 +29,78 @@
   text-align: center;
   z-index: 5;
   pointer-events: none;
-  filter: drop-shadow(0 12px 28px var(--state-shadow));
+  overflow: hidden;
+}
+
+.root::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--frame-bg-overlay);
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* 左上飘带角饰 */
+.decoTL {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 130px;
+  height: 100px;
+  background-image: var(--deco-narration-source);
+  background-repeat: no-repeat;
+  background-size: 900px auto; /* 1024 * (130/148) */
+  background-position: -10px -6px;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.78;
+  -webkit-mask-image: radial-gradient(
+    ellipse at 0% 0%,
+    rgba(0, 0, 0, 1) 0%,
+    rgba(0, 0, 0, 0.85) 50%,
+    rgba(0, 0, 0, 0) 100%
+  );
+  mask-image: radial-gradient(
+    ellipse at 0% 0%,
+    rgba(0, 0, 0, 1) 0%,
+    rgba(0, 0, 0, 0.85) 50%,
+    rgba(0, 0, 0, 0) 100%
+  );
+}
+
+/* 右下烛火/花卉角饰 */
+.decoBR {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 200px;
+  height: 130px;
+  background-image: var(--deco-narration-source);
+  background-repeat: no-repeat;
+  background-size: 800px auto;
+  background-position: right -4px bottom -4px;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.85;
+  -webkit-mask-image: radial-gradient(
+    ellipse at 100% 100%,
+    rgba(0, 0, 0, 1) 0%,
+    rgba(0, 0, 0, 0.82) 48%,
+    rgba(0, 0, 0, 0) 100%
+  );
+  mask-image: radial-gradient(
+    ellipse at 100% 100%,
+    rgba(0, 0, 0, 1) 0%,
+    rgba(0, 0, 0, 0.82) 48%,
+    rgba(0, 0, 0, 0) 100%
+  );
 }
 
 .inner {
+  position: relative;
+  z-index: 2;
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -46,29 +120,60 @@
   font-weight: 400;
   text-shadow: 0 1px 0 rgba(255, 250, 240, 0.5);
   white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .line:last-child {
   margin-bottom: 0;
 }
 
-/* 长旁白（>3 行）时左对齐 */
+/* 长旁白（>3 行）时左对齐、去斜体 */
 .long .line {
   text-align: left;
   font-style: normal;
 }
 
-/* 赛博主题：深色背景改用亮色旁白文字 */
-:global([data-theme="cyber"]) .line {
+/* ────────── 主题：赛博 ────────── */
+:global([data-theme='cyber']) .root {
+  background: linear-gradient(
+    180deg,
+    rgba(10, 16, 32, 0.78) 0%,
+    rgba(18, 12, 34, 0.84) 100%
+  );
+  border-color: rgba(0, 200, 255, 0.55);
+  box-shadow:
+    0 0 0 1px rgba(255, 90, 200, 0.32) inset,
+    0 0 18px rgba(0, 200, 255, 0.28),
+    0 0 30px rgba(255, 90, 200, 0.22),
+    0 12px 28px rgba(0, 0, 0, 0.55);
+}
+
+:global([data-theme='cyber']) .root::before {
+  background:
+    radial-gradient(
+      ellipse at 100% 0%,
+      rgba(255, 90, 200, 0.16) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse at 0% 100%,
+      rgba(0, 200, 255, 0.18) 0%,
+      transparent 55%
+    );
+}
+
+:global([data-theme='cyber']) .line {
   color: rgba(200, 235, 255, 0.88);
   text-shadow:
     0 0 10px rgba(0, 180, 255, 0.35),
     0 1px 0 rgba(0, 0, 0, 0.9);
 }
 
-/* 极窄屏让步 */
+/* 极窄屏 / 横屏让步 */
 @media (max-height: 600px) {
   .root {
     width: min(600px, calc(100% - var(--space-4)));
+    padding: 22px 48px;
+    max-height: 60vh;
   }
 }

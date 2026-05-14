@@ -74,6 +74,8 @@ export function DialogueBox({ line, sceneId, frameId, maleLineNumber, onComplete
       role="button"
       tabIndex={0}
     >
+      <span className={styles.decoTL} aria-hidden="true" />
+      <span className={styles.decoBR} aria-hidden="true" />
       {!isNarrator && (
         <div className={styles.namePlate}>
           <div className={styles.nameStack} style={nameOffset}>

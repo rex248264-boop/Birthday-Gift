@@ -3,6 +3,7 @@ import { useGame, getSceneTheme } from '@/engine';
 import { TitleScreen } from '@/pages/TitleScreen';
 import { GameScreen } from '@/pages/GameScreen';
 import { EndingScreen } from '@/pages/EndingScreen';
+import { DevPanel } from '@/pages/DevPanel';
 
 const stageStyle: CSSProperties = {
   position: 'relative',
@@ -26,6 +27,7 @@ export default function App() {
       {phase === 'title' && <TitleScreen />}
       {phase === 'playing' && <GameScreen />}
       {phase === 'ending' && <EndingScreen />}
+      <DevPanel />
     </div>
   );
 }

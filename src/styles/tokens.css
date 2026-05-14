@@ -35,12 +35,76 @@
   --state-glow-gold: rgba(201, 168, 106, 0.55);
   --state-overlay-dark: rgba(0, 0, 0, 0.55);
 
-  /* ============ Background images（UI 资源） ============ */
+  /* ============ Background images（UI 资源·遗留 PNG，仅作角饰裁切源） ============ */
   --bg-dialogue: url('/assets/ui/dialogue-bubble.png');
   --bg-narration: url('/assets/ui/narration-background.png');
   --bg-choice-normal: url('/assets/ui/choice-normal.png');
   --bg-choice-selected: url('/assets/ui/choice-selected.png');
   --bg-choice-confirm: url('/assets/ui/choice-confirm.png');
+
+  /* ============ 纸感面板·代码绘制 ============
+   * 各主题通过覆盖以下变量切换皮肤；面板形态（自适应高度、金边、圆角、
+   * 名牌/角饰位置）一律通过 CSS 控制，不再依赖固定比例的底图 PNG。
+   */
+  /* 面板底色（米白纸感） */
+  --frame-bg: linear-gradient(
+    180deg,
+    rgba(255, 250, 232, 0.96) 0%,
+    rgba(248, 238, 214, 0.94) 55%,
+    rgba(240, 226, 196, 0.92) 100%
+  );
+  /* 面板纹理（暖光高光，叠在底色之上） */
+  --frame-bg-overlay: radial-gradient(
+      ellipse at 30% 25%,
+      rgba(255, 246, 220, 0.55) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse at 70% 80%,
+      rgba(244, 213, 138, 0.18) 0%,
+      transparent 55%
+    );
+
+  /* 双层金边：外细金线 + 内极淡纸边 */
+  --frame-border-color: var(--gold-line);
+  --frame-border-width: 1.5px;
+  --frame-inner-stroke: 0 0 0 1px rgba(255, 250, 232, 0.85) inset;
+  --frame-outer-glow: 0 12px 28px var(--state-shadow);
+  --frame-radius: 22px;
+
+  /* 名牌（对话框左上）皮肤 */
+  --plate-bg: linear-gradient(
+    180deg,
+    rgba(255, 250, 232, 0.95),
+    rgba(244, 232, 206, 0.95)
+  );
+  --plate-border-color: var(--gold-line);
+  --plate-radius: 12px;
+  /* 名牌内的「◇——◇」分隔线颜色 */
+  --plate-rule: var(--gold-line);
+
+  /* 角饰（top-left 缎带 / bottom-right 水彩花）—— 直接 sprite 自原 PNG */
+  --deco-source: url('/assets/ui/dialogue-bubble.png');
+  --deco-source-size: 1024 / 425;
+  --deco-narration-source: url('/assets/ui/narration-background.png');
+  --deco-narration-source-size: 1024 / 323;
+
+  /* 选项胶囊皮肤 */
+  --choice-bg: linear-gradient(
+    180deg,
+    rgba(255, 250, 232, 0.94) 0%,
+    rgba(244, 234, 210, 0.92) 100%
+  );
+  --choice-border: var(--gold-line-soft);
+  --choice-radius: 9999px;
+  --choice-selected-bg: linear-gradient(
+    180deg,
+    rgba(255, 240, 200, 0.96) 0%,
+    rgba(244, 213, 138, 0.94) 100%
+  );
+  --choice-selected-border: var(--gold-deep);
+  --choice-selected-glow: 0 0 14px rgba(244, 213, 138, 0.55),
+    0 6px 18px rgba(168, 132, 80, 0.32);
 
   /* ============ Typography ============ */
   --font-serif: -apple-system, BlinkMacSystemFont, "SF Pro Text",
@@ -91,13 +155,18 @@
   --dur-slow: 600ms;
 }
 
-/* ============ Theme: 赛博朋克 ============ */
+/* ============ Theme: 赛博朋克 ============
+ * 框体由代码绘制（详见 DialogueBox/NarrationBox/ChoiceMenu module.css 的
+ * [data-theme="cyber"] 覆盖块）。这里保留 PNG 引用仅供角饰 sprite 使用。
+ */
 [data-theme="cyber"] {
   --bg-dialogue:     url('/assets/ui/cyber/dialogue-bubble.png');
   --bg-narration:    url('/assets/ui/cyber/narration-background.png');
   --bg-choice-normal:   url('/assets/ui/cyber/choice-normal.png');
   --bg-choice-selected: url('/assets/ui/cyber/choice-selected.png');
   --bg-choice-confirm:  url('/assets/ui/cyber/choice-confirm.png');
+  --deco-source:           url('/assets/ui/cyber/dialogue-bubble.png');
+  --deco-narration-source: url('/assets/ui/cyber/narration-background.png');
 }
 
 /* ============ Theme: 民国 ============ */
@@ -107,6 +176,8 @@
   --bg-choice-normal:   url('/assets/ui/minguo/choice-normal.png');
   --bg-choice-selected: url('/assets/ui/minguo/choice-selected.png');
   --bg-choice-confirm:  url('/assets/ui/minguo/choice-confirm.png');
+  --deco-source:           url('/assets/ui/minguo/dialogue-bubble.png');
+  --deco-narration-source: url('/assets/ui/minguo/narration-background.png');
 }
 
 /* ============ Font scale overrides ============ */
