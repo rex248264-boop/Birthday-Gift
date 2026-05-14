@@ -29,8 +29,6 @@ export function NarrationBox({ lines, pageStart, pageSize }: Props) {
         transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
         aria-live="polite"
       >
-        <span className={styles.decoTL} aria-hidden="true" />
-        <span className={styles.decoBR} aria-hidden="true" />
         <div className={styles.inner} style={narrationOffset}>
           {visible.map((line, i) => (
             <motion.p

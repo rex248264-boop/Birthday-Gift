@@ -47,12 +47,21 @@ body {
  * Design canvas: 1206 × 2442 px (@3x ≈ 402 × 814 logical).
  *   ratio = 1206 / 2442 ≈ 0.4938 (portrait)
  *
- * The actual sizing is applied inline in `App.tsx` (see stageStyle) so it can
- * never get stripped or shadowed by CSS HMR. This rule reserves the class
- * for future ergonomics (e.g. theming).
+ * 默认尺寸在 `App.tsx` 的 `stageStyle` 内联里，使用 100vh / 100vw 作为
+ * 兜底（确保旧浏览器仍能工作，且不被 CSS HMR 删除）。
+ *
+ * 下面这条规则用 `100dvh` / `100dvw` 覆盖兜底——`dvh/dvw` 是"动态视口"
+ * 单位，会**随 iOS Safari 地址栏的显隐动态调整**，从而修复"画面上下
+ * 各被截掉一点"的问题。
+ *
+ * - 现代浏览器（Safari 15.4+ / Chrome 108+ / Firefox 101+）认得 `dvh/dvw`
+ *   → 这条 `!important` 规则生效，舞台高度刚好等于可视区
+ * - 旧浏览器不认识 `dvh/dvw` → 整条 declaration 被判无效 → 自动落回内联的
+ *   `100vh/100vw` 兜底，行为与之前一致
  */
 .stage {
-  /* sizing applied inline; keep this rule for potential overrides */
+  width: min(100dvw, calc(100dvh * 1206 / 2442)) !important;
+  height: min(100dvh, calc(100dvw * 2442 / 1206)) !important;
 }
 
 input,

@@ -1,13 +1,3 @@
-/**
- * ChoiceMenu · 自适应高度版（代码绘制胶囊按钮）
- *
- * 旧版每个选项按 1024×167 锁定 aspect-ratio + PNG 底图，长文案被 nowrap+省略号切掉。
- * 本版本：
- * - 选项胶囊由 CSS 绘制：金边 + 米白纸感 + 全圆角；高度由文案撑开，可换行
- * - 选中态：金光发光 + 右侧 ✓ 标记（内联 SVG）
- * - 确认按钮：同族胶囊但更显眼（更粗描金 + 更深字色 + 大字距）
- */
-
 .overlay {
   position: absolute;
   inset: 0;
@@ -16,6 +6,7 @@
   align-items: center;
   padding-top: calc(env(safe-area-inset-top) + var(--space-7));
   padding-bottom: calc(env(safe-area-inset-bottom) + var(--space-7));
+  /* Subtle vignette so the scene video still shows through; no heavy dimming. */
   background: linear-gradient(
     to bottom,
     rgba(0, 0, 0, 0.05) 0%,
@@ -25,6 +16,7 @@
   z-index: 10;
   pointer-events: auto;
 }
+
 
 .subPrompt {
   margin: var(--space-4) var(--space-6) 0;
@@ -38,147 +30,112 @@
   max-width: 480px;
 }
 
-/* ────────── 选项胶囊 ────────── */
+/* ────────── Options ────────── */
 .options {
   margin-top: auto;
   margin-bottom: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  /* 选项之间贴得更近：金边装饰带本身已有内 padding，2px 的视觉间距即可 */
+  gap: 2px;
   width: 100%;
-  padding: 0 var(--space-3);
 }
 
 .option {
-  position: relative;
   width: min(780px, calc(100% - var(--space-4)));
-  /* 关键：去 aspect-ratio；高度由内容撑开 */
-  min-height: 56px;
-  background: var(--choice-bg);
-  border: 1.4px solid var(--choice-border);
-  border-radius: var(--choice-radius);
-  box-shadow:
-    0 0 0 1px rgba(255, 250, 232, 0.7) inset,
-    0 6px 14px rgba(58, 38, 18, 0.32);
-  padding: 12px 56px 12px 28px; /* 右侧 56px 给 ✓ 留位 */
+  aspect-ratio: 1024 / 167;
+  background-image: var(--bg-choice-normal);
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-color: transparent;
+  border: none;
+  /* padding-top 3% / padding-bottom 0% → 文本视觉中心下移约 1.5% */
+  padding: 3% 18% 0 14%;
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: var(--font-serif);
   font-size: var(--fs-md);
   color: var(--ink-deep);
-  letter-spacing: 0.06em;
-  line-height: 1.55;
+  letter-spacing: 0.08em;
+  line-height: 1.4;
   cursor: pointer;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
-  transition:
-    background 220ms var(--ease-out-soft),
-    border-color 220ms var(--ease-out-soft),
-    box-shadow 220ms var(--ease-out-soft),
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45));
+  transition: filter 220ms var(--ease-out-soft),
     transform 220ms var(--ease-out-soft);
 }
 
 .option:hover {
-  border-color: var(--gold-line);
-  box-shadow:
-    0 0 0 1px rgba(255, 250, 232, 0.8) inset,
-    0 8px 18px rgba(58, 38, 18, 0.36);
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.5)) brightness(1.06);
   transform: translateY(-1px);
 }
 
 .option:active {
   transform: scale(0.985);
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5)) brightness(0.96);
 }
 
 .option.selected {
-  background: var(--choice-selected-bg);
-  border-color: var(--choice-selected-border);
+  background-image: var(--bg-choice-selected);
   color: var(--ink-name);
   font-weight: 500;
-  box-shadow:
-    0 0 0 1px rgba(255, 250, 232, 0.85) inset,
-    var(--choice-selected-glow);
-}
-
-/* 选中态右侧 ✓ 标记（内联 SVG） */
-.option.selected::after {
-  content: '';
-  position: absolute;
-  right: 18px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 22px;
-  height: 22px;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22'><circle cx='11' cy='11' r='9.5' fill='%23f4d58a' stroke='%23a88450' stroke-width='1.2'/><path d='M6 11.5 L9.5 15 L16 8' fill='none' stroke='%23a88450' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>");
-  background-repeat: no-repeat;
-  background-size: contain;
-  pointer-events: none;
+  filter: drop-shadow(0 8px 22px var(--state-glow-gold))
+    drop-shadow(0 0 6px rgba(244, 213, 138, 0.4));
 }
 
 .option.dim {
-  opacity: 0.45;
-  filter: grayscale(0.3);
+  opacity: 0.5;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.4)) grayscale(0.3);
 }
 
 .optionLabel {
   text-align: center;
-  /* 取消 nowrap，允许换行 —— 这是高度自适应的关键 */
-  white-space: pre-wrap;
-  word-break: break-word;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   max-width: 100%;
-  line-height: inherit;
 }
 
-/* ────────── 确认按钮 ────────── */
+/* ────────── Confirm Button ────────── */
 .confirmRow {
   margin-top: var(--space-5);
   width: 100%;
   display: flex;
   justify-content: center;
-  min-height: 64px;
-  padding: 0 var(--space-3);
+  min-height: 78px; /* reserve space so layout doesn't jump when it appears */
 }
 
 .confirm {
-  position: relative;
-  width: min(420px, 80%);
-  min-height: 54px;
-  background: linear-gradient(
-    180deg,
-    rgba(255, 246, 220, 0.96) 0%,
-    rgba(244, 220, 158, 0.94) 100%
-  );
-  border: 1.5px solid var(--gold-deep);
-  border-radius: var(--choice-radius);
-  box-shadow:
-    0 0 0 1px rgba(255, 250, 232, 0.85) inset,
-    0 0 14px rgba(244, 213, 138, 0.45),
-    0 10px 22px rgba(58, 38, 18, 0.42);
+  /* 资源 choice-confirm.png 为 1672×167（≈10:1），保持原始比例避免压缩变形 */
+  width: min(860px, 96%);
+  aspect-ratio: 1672 / 167;
+  background-image: var(--bg-choice-confirm);
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-color: transparent;
+  border: none;
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: var(--font-fancy);
-  font-size: var(--fs-lg);
+  font-size: var(--fs-xl);
   color: var(--ink-name);
   letter-spacing: 0.4em;
-  padding: 10px 20px 10px calc(20px + 0.4em); /* 抵消 letter-spacing 让视觉居中 */
+  padding-left: 0.4em; /* offset for letter-spacing to keep visually centered */
   cursor: pointer;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
-  transition:
-    transform 220ms var(--ease-out-soft),
-    box-shadow 220ms var(--ease-out-soft),
-    filter 220ms var(--ease-out-soft);
+  filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.55));
+  transition: filter 220ms var(--ease-out-soft),
+    transform 220ms var(--ease-out-soft);
 }
 
 .confirm:hover {
+  filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.55)) brightness(1.08);
   transform: scale(1.03);
-  box-shadow:
-    0 0 0 1px rgba(255, 250, 232, 0.92) inset,
-    0 0 18px rgba(244, 213, 138, 0.62),
-    0 12px 26px rgba(58, 38, 18, 0.45);
 }
 
 .confirm:active {
@@ -190,61 +147,17 @@
   line-height: 1;
 }
 
-/* ────────── 主题：赛博 ────────── */
-:global([data-theme='cyber']) .option {
-  background: linear-gradient(
-    180deg,
-    rgba(10, 16, 32, 0.78) 0%,
-    rgba(18, 12, 34, 0.82) 100%
-  );
-  border-color: rgba(0, 200, 255, 0.55);
+/* 赛博主题：深色选项背景改用亮色文字，对齐 DialogueBox */
+:global([data-theme="cyber"]) .option {
   color: rgba(210, 240, 255, 0.92);
-  box-shadow:
-    0 0 0 1px rgba(255, 90, 200, 0.28) inset,
-    0 0 14px rgba(0, 200, 255, 0.22),
-    0 6px 14px rgba(0, 0, 0, 0.55);
 }
 
-:global([data-theme='cyber']) .option:hover {
-  border-color: rgba(0, 220, 255, 0.85);
-  box-shadow:
-    0 0 0 1px rgba(255, 90, 200, 0.36) inset,
-    0 0 18px rgba(0, 220, 255, 0.4),
-    0 8px 18px rgba(0, 0, 0, 0.6);
+:global([data-theme="cyber"]) .option.selected {
+  color: rgba(180, 240, 255, 0.95);
 }
 
-:global([data-theme='cyber']) .option.selected {
-  background: linear-gradient(
-    180deg,
-    rgba(32, 18, 56, 0.92) 0%,
-    rgba(52, 14, 64, 0.92) 100%
-  );
-  border-color: rgba(255, 90, 200, 0.95);
-  color: rgba(255, 220, 240, 0.98);
-  box-shadow:
-    0 0 0 1px rgba(0, 220, 255, 0.4) inset,
-    0 0 18px rgba(255, 90, 200, 0.55),
-    0 0 28px rgba(0, 220, 255, 0.35),
-    0 6px 14px rgba(0, 0, 0, 0.55);
-}
-
-:global([data-theme='cyber']) .option.selected::after {
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22'><rect x='2' y='2' width='18' height='18' rx='4' fill='rgba(20,12,40,0.85)' stroke='%23ff5ac8' stroke-width='1.4'/><path d='M6 11.5 L9.5 15 L16 8' fill='none' stroke='%2300eaff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>");
-}
-
-:global([data-theme='cyber']) .confirm {
-  background: linear-gradient(
-    180deg,
-    rgba(20, 14, 44, 0.92) 0%,
-    rgba(36, 14, 56, 0.94) 100%
-  );
-  border-color: rgba(255, 90, 200, 0.85);
-  color: rgba(220, 240, 255, 0.96);
-  box-shadow:
-    0 0 0 1px rgba(0, 220, 255, 0.38) inset,
-    0 0 16px rgba(255, 90, 200, 0.55),
-    0 0 28px rgba(0, 220, 255, 0.32),
-    0 10px 22px rgba(0, 0, 0, 0.6);
+:global([data-theme="cyber"]) .confirm {
+  color: rgba(210, 240, 255, 0.92);
 }
 
 /* 长 prompt 下让步 */
@@ -252,7 +165,11 @@
   .overlay {
     padding-top: calc(env(safe-area-inset-top) + var(--space-5));
   }
+  .banner {
+    font-size: var(--fs-base);
+    padding: var(--space-2) var(--space-5);
+  }
   .options {
-    gap: 8px;
+    gap: 1px;
   }
 }

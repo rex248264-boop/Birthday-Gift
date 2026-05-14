@@ -1,14 +1,3 @@
-/**
- * DialogueBox · 自适应高度版（代码绘制纸感面板）
- *
- * 区别于旧版「按 1024×425 PNG 锁定 aspect-ratio」，本版本：
- * - 容器由 CSS 绘制：金边 + 米白纸感 + 圆角；高度由内容撑开，长台词不再被切
- * - 名牌（左上）是真正的 DOM 节点 + CSS 圆角小卡，内含 ◇—◇ SVG 装饰条
- * - 左上「金缎」+ 右下「水彩花」角饰由 CSS sprite 从原 PNG 裁出，绝对定位
- *   贴在容器角落，不参与拉伸；主题通过 --deco-source 覆盖
- * - 主题（赛博/民国）通过 [data-theme] 覆盖背景、边、字色与角饰源
- */
-
 .root {
   position: absolute;
   left: 0;
@@ -16,114 +5,45 @@
   bottom: calc(env(safe-area-inset-bottom) + var(--space-7));
   margin-inline: auto;
   width: min(660px, calc(100% - var(--space-4)));
-  /* 关键：高度自适应；name plate 占用顶部 ~64px，正文 padding 取 80 → 内容自由伸缩 */
-  min-height: 152px;
-  max-height: min(58vh, 520px);
-  background: var(--frame-bg);
-  background-blend-mode: normal;
-  border: var(--frame-border-width) solid var(--frame-border-color);
-  border-radius: var(--frame-radius);
-  box-shadow: var(--frame-inner-stroke), var(--frame-outer-glow);
-  padding: 80px 32px 24px 32px;
+  aspect-ratio: 1024 / 425;
+  background-image: var(--bg-dialogue);
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
   display: block;
+  padding: 0;
+  border: none;
+  filter: drop-shadow(0 12px 28px var(--state-shadow));
   z-index: 5;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
   cursor: pointer;
-  overflow: hidden;
 }
 
-/* 纸感高光叠层（不影响内容，只在底色上加暖光） */
-.root::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: var(--frame-bg-overlay);
-  border-radius: inherit;
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* 角饰：左上金缎 —— CSS sprite 从原 PNG 裁出 */
-.decoTL {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 132px;
-  height: 56px;
-  /* PNG 原图 1024×425；缎带位于 (≈42,0)→(≈195,52) 区域；按比例缩放后 sprite */
-  background-image: var(--deco-source);
-  background-repeat: no-repeat;
-  background-size: 880px auto; /* 1024 * (132/153) ≈ 884，向下取整 */
-  background-position: -24px 0px;
-  pointer-events: none;
-  z-index: 1;
-  opacity: 0.92;
-}
-
-/* 角饰：右下水彩花 —— CSS sprite 从原 PNG 裁出 */
-.decoBR {
-  position: absolute;
-  right: -2px;
-  bottom: -2px;
-  width: 220px;
-  height: 200px;
-  background-image: var(--deco-source);
-  background-repeat: no-repeat;
-  /* 把 1024×425 的 PNG 放大显示，让右下花卉刚好填满该角 */
-  background-size: 760px auto;
-  background-position: right -8px bottom -10px;
-  pointer-events: none;
-  z-index: 1;
-  opacity: 0.88;
-  /* 用 mask 让花饰向中心淡出，避免锐切 */
-  -webkit-mask-image: radial-gradient(
-    ellipse at 100% 100%,
-    rgba(0, 0, 0, 1) 0%,
-    rgba(0, 0, 0, 0.85) 45%,
-    rgba(0, 0, 0, 0) 100%
-  );
-  mask-image: radial-gradient(
-    ellipse at 100% 100%,
-    rgba(0, 0, 0, 1) 0%,
-    rgba(0, 0, 0, 0.85) 45%,
-    rgba(0, 0, 0, 0) 100%
-  );
-}
-
-/* 名牌：圆角小卡，位于左上角内 */
+/* 名牌区域：落在左上凸起铭牌的中央，和 PNG 装饰融为一体。 */
 .namePlate {
   position: absolute;
-  top: 12px;
-  left: 16px;
-  height: 48px;
-  min-width: 168px;
-  padding: 0 22px;
-  background: var(--plate-bg);
-  border: 1px solid var(--plate-border-color);
-  border-radius: var(--plate-radius);
-  box-shadow: 0 1px 0 rgba(255, 250, 232, 0.8) inset,
-    0 2px 8px rgba(58, 38, 18, 0.18);
+  /* 默认（通用/现实）坐标 */
+  top: 8%;
+  left: 10%;
+  width: 27.5%;
+  height: 18%;
   display: flex;
   align-items: center;
   justify-content: center;
+  text-align: center;
   pointer-events: none;
-  z-index: 3;
 }
 
-/* 名牌内的 ◇——◇ 分隔线（内联 SVG 实现） */
-.namePlate::before {
-  content: '';
-  position: absolute;
-  left: 16px;
-  right: 16px;
-  bottom: 8px;
-  height: 6px;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 6' preserveAspectRatio='none'><line x1='8' y1='3' x2='112' y2='3' stroke='%23c9a86a' stroke-width='0.6' stroke-linecap='round'/><polygon points='4,3 8,1.5 12,3 8,4.5' fill='%23c9a86a'/><polygon points='108,3 112,1.5 116,3 112,4.5' fill='%23c9a86a'/></svg>");
-  background-repeat: no-repeat;
-  background-size: 100% 100%;
-  opacity: 0.85;
-  pointer-events: none;
+/* 赛博主题：标签框更靠上、偏右 */
+:global([data-theme="cyber"]) .namePlate {
+  top: 5.5%;
+  left: 10%;
+}
+
+/* 民国主题：沿用默认坐标，可单独微调 */
+:global([data-theme="minguo"]) .namePlate {
+  top: 8%;
+  left: 10%;
 }
 
 .nameStack {
@@ -139,7 +59,7 @@
 
 .name {
   font-family: var(--font-sans);
-  font-size: var(--fs-md);
+  font-size: var(--fs-base);
   font-weight: 500;
   color: var(--ink-soft);
   letter-spacing: 0.08em;
@@ -155,14 +75,32 @@
   font-style: italic;
 }
 
-/* 正文区：随内容自适应高度，无需绝对定位 */
+/* 赛博主题：深色背景需亮色文字，字体与通用保持一致 */
+:global([data-theme="cyber"]) .name {
+  font-family: var(--font-sans);
+  color: rgba(180, 240, 255, 0.95);
+  text-shadow:
+    0 0 8px rgba(0, 200, 255, 0.7),
+    0 1px 0 rgba(0, 0, 0, 0.8);
+}
+
+:global([data-theme="cyber"]) .alias {
+  font-family: var(--font-sans);
+  color: rgba(100, 210, 240, 0.8);
+}
+
+/* 正文区域：位于气泡中央，避开顶部名牌和左右金边 */
 .bodyZone {
-  position: relative;
-  z-index: 2;
+  position: absolute;
+  top: 22%;
+  bottom: 10%;
+  left: 9%;
+  right: 9%;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  /* 与外层 padding 共同决定内容区域；不再使用 top/bottom 百分比 */
+  justify-content: center;
+  gap: 4px;
+  overflow: hidden;
 }
 
 .text {
@@ -175,7 +113,15 @@
   letter-spacing: 0.04em;
   white-space: pre-wrap;
   text-align: left;
-  word-break: break-word;
+}
+
+/* 赛博主题正文：深色背景改用浅色字 */
+:global([data-theme="cyber"]) .text {
+  color: rgba(210, 240, 255, 0.92);
+}
+
+:global([data-theme="cyber"]) .action {
+  color: rgba(140, 210, 240, 0.75);
 }
 
 .caret {
@@ -192,24 +138,26 @@
   color: var(--ink-mute);
   font-style: italic;
   letter-spacing: 0.04em;
-  line-height: 1.55;
+  line-height: 1.5;
 }
 
-/* 旁白 fallback（实际旁白走 NarrationBox；此处保留兼容） */
+/* 旁白变体（保留 fallback，正常流程走 NarrationBox） */
 .narrator {
-  padding-top: 28px;
-  padding-bottom: 28px;
+  /* 旁白如果走到这里就用静音版本（不显示名牌） */
 }
 
-.narrator .namePlate,
-.narrator .decoTL {
+.narrator .namePlate {
   display: none;
+}
+
+.narrator .bodyZone {
+  top: 12%;
+  bottom: 12%;
 }
 
 .narrator .text {
   font-style: italic;
   color: var(--ink-soft);
-  text-align: center;
 }
 
 @keyframes caretBlink {
@@ -218,84 +166,9 @@
   }
 }
 
-/* ────────── 主题：赛博 ────────── */
-:global([data-theme='cyber']) .root {
-  background: linear-gradient(
-      180deg,
-      rgba(12, 18, 38, 0.78) 0%,
-      rgba(18, 12, 34, 0.86) 100%
-    );
-  border-color: rgba(0, 200, 255, 0.55);
-  box-shadow:
-    0 0 0 1px rgba(255, 90, 200, 0.32) inset,
-    0 0 18px rgba(0, 200, 255, 0.28),
-    0 0 30px rgba(255, 90, 200, 0.22),
-    0 12px 28px rgba(0, 0, 0, 0.55);
-}
-
-:global([data-theme='cyber']) .root::before {
-  background:
-    radial-gradient(
-      ellipse at 100% 80%,
-      rgba(255, 90, 200, 0.16) 0%,
-      transparent 55%
-    ),
-    radial-gradient(
-      ellipse at 0% 20%,
-      rgba(0, 200, 255, 0.18) 0%,
-      transparent 55%
-    );
-}
-
-:global([data-theme='cyber']) .namePlate {
-  background: linear-gradient(
-    180deg,
-    rgba(8, 18, 36, 0.85),
-    rgba(14, 10, 30, 0.88)
-  );
-  border: 1px solid rgba(0, 200, 255, 0.6);
-  box-shadow:
-    0 0 0 1px rgba(255, 90, 200, 0.3) inset,
-    0 0 10px rgba(0, 200, 255, 0.35);
-}
-
-:global([data-theme='cyber']) .namePlate::before {
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 6' preserveAspectRatio='none'><line x1='4' y1='3' x2='116' y2='3' stroke='%2300c8ff' stroke-width='0.6'/><rect x='2' y='2' width='3' height='2' fill='%23ff5ac8'/><rect x='115' y='2' width='3' height='2' fill='%23ff5ac8'/></svg>");
-}
-
-:global([data-theme='cyber']) .name {
-  color: rgba(180, 240, 255, 0.95);
-  text-shadow:
-    0 0 8px rgba(0, 200, 255, 0.7),
-    0 1px 0 rgba(0, 0, 0, 0.8);
-}
-
-:global([data-theme='cyber']) .alias {
-  color: rgba(100, 210, 240, 0.8);
-}
-
-:global([data-theme='cyber']) .text {
-  color: rgba(210, 240, 255, 0.92);
-}
-
-:global([data-theme='cyber']) .action {
-  color: rgba(140, 210, 240, 0.75);
-}
-
-/* ────────── 主题：民国 ────────── */
-:global([data-theme='minguo']) .root {
-  background: linear-gradient(
-    180deg,
-    rgba(244, 234, 214, 0.96) 0%,
-    rgba(232, 220, 196, 0.94) 100%
-  );
-  border-color: var(--gold-line);
-}
-
-/* 极窄屏让步 */
+/* 极窄屏 / 横屏让步 */
 @media (max-height: 600px) {
   .root {
     width: min(600px, calc(100% - var(--space-4)));
-    max-height: 60vh;
   }
 }
