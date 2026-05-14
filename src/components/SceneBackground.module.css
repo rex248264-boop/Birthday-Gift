@@ -1,9 +1,22 @@
+/**
+ * 场景背景层。
+ *
+ * 用 `position: fixed; inset: 0` 让背景图脱离舞台容器，铺满整个视口
+ *  —— 这样在视口比 1206:2442 更宽的环境（桌面 Safari、iPad 横屏等）下，
+ * 图片会通过 `background-size: cover` 自动放大、吃掉两侧的黑边；
+ * 而舞台里的对话框、人物、按钮等 UI 元素仍然锁在中央的竖屏区域内。
+ *
+ * 注意：DOM 上 SceneBackground 仍然挂在 FrameView 内部，所以它依然在
+ * `#root` 的子树里渲染、能继承 React 的 sceneId/frameId 上下文；
+ * `position: fixed` 只改变视觉定位，不影响组件层级。
+ */
 .root {
-  position: absolute;
+  position: fixed;
   inset: 0;
   overflow: hidden;
   background: radial-gradient(circle at 50% 40%, #1a1418 0%, #07060a 70%, #000 100%);
   z-index: 0;
+  pointer-events: none;
 }
 
 .image {
