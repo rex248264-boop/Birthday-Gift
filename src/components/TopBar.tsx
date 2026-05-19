@@ -7,7 +7,7 @@ type Props = {
 };
 
 export function TopBar({ contextLabel }: Props) {
-  const setPhase = useGame((s) => s.setPhase);
+  const goToTitle = useGame((s) => s.goToTitle);
   return (
     <motion.div
       className={styles.root}
@@ -19,7 +19,7 @@ export function TopBar({ contextLabel }: Props) {
         className={styles.backBtn}
         onClick={(e) => {
           e.stopPropagation();
-          setPhase('title');
+          goToTitle();
         }}
         aria-label="返回标题"
       >

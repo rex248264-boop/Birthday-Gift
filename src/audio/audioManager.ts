@@ -21,13 +21,17 @@ class AudioManager {
     }
   }
 
-  async playBGM(sceneId: string, hint?: string) {
+  /**
+   * 尝试播放本场 BGM。若找不到文件则保持当前曲目循环（跨幕延续）。
+   * @returns 是否成功切换到新曲目
+   */
+  async playBGM(sceneId: string, hint?: string): Promise<boolean> {
     const key = hint || sceneId;
-    if (this.bgmKey === key && this.bgm) return;
+    if (this.bgmKey === key && this.bgm) return true;
 
     const candidates = resolveBGM(sceneId, hint);
     const url = await pickFirstExisting(candidates);
-    if (!url) return;
+    if (!url) return false;
 
     if (this.bgm) {
       const old = this.bgm;
@@ -38,6 +42,7 @@ class AudioManager {
     this.bgmKey = key;
     this.bgm.play();
     this.bgm.fade(0, 0.6, 1200);
+    return true;
   }
 
   stopBGM() {
@@ -58,12 +63,19 @@ class AudioManager {
     h.once('end', () => h.unload());
   }
 
-  async playVoice(sceneId: string, frameId: string, maleLineIdx: number, hint?: string) {
+  async playVoice(
+    sceneId: string,
+    frameId: string,
+    maleLineIdx: number,
+    hint?: string,
+    cacheBust?: number,
+  ) {
     this.stopVoice();
     const candidates = resolveVoice(sceneId, frameId, maleLineIdx, hint);
     const url = await pickFirstExisting(candidates);
     if (!url) return;
-    this.currentVoice = new Howl({ src: [url], volume: 0.9, html5: true });
+    const src = cacheBust ? `${url}?v=${cacheBust}` : url;
+    this.currentVoice = new Howl({ src: [src], volume: 0.9, html5: true });
     this.currentVoice.play();
   }
 

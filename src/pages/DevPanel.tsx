@@ -4,6 +4,7 @@ import {
   useTextOffsets,
   useCurrentTheme,
   getNonEmptyOffsets,
+  getEffectiveItems,
   TEXT_SLOTS,
   ALL_THEMES,
   THEME_LABEL,
@@ -12,6 +13,7 @@ import {
   type FontScale,
 } from '@/engine';
 import type { Frame, SceneSwitchItem } from '@/parser';
+import { TITLE_BGM_SCENE_ID } from '@/engine/assetResolver';
 import styles from './DevPanel.module.css';
 
 type SaveStatus = 'idle' | 'saving' | 'ok' | 'err' | 'unchanged' | 'notfound';
@@ -135,8 +137,17 @@ export function DevPanel() {
             </div>
           </section>
 
+          {/* ── 背景音乐（首页 + 各幕）── */}
+          <BgmUploadSection />
+
+          {/* ── 标题 LOGO ── */}
+          <TitleLogoUploadSection />
+
           {/* ── 素材上传 ── */}
           <AssetUploadSection sceneId={currentSceneId} frameId={currentFrameId} />
+
+          {/* ── 男主台词配音 ── */}
+          <MaleVoiceUploadSection sceneId={currentSceneId} frameId={currentFrameId} />
 
           {/* ── 内容编辑器 ── */}
           {editFilePath && (
@@ -494,8 +505,14 @@ const SCENE_SWITCH_ACCEPT = 'image/png,image/jpeg,image/webp';
 const BG_EXTS = ['png', 'jpg', 'jpeg', 'webp', 'mp4', 'webm'];
 const TRANSITION_EXTS = ['mp4', 'webm'];
 const SCENE_SWITCH_EXTS = ['png', 'jpg', 'jpeg', 'webp'];
+const VOICE_ACCEPT = 'audio/mpeg,audio/mp3,audio/ogg,audio/mp4,audio/x-m4a,audio/wav,.mp3,.ogg,.m4a,.wav';
+const VOICE_EXTS = ['mp3', 'ogg', 'm4a', 'wav'];
+const BGM_ACCEPT = 'audio/mpeg,audio/mp3,audio/ogg,audio/mp4,audio/x-m4a,.mp3,.ogg,.m4a';
+const BGM_EXTS = ['mp3', 'ogg', 'm4a'];
+const TITLE_LOGO_ACCEPT = 'image/png,image/jpeg,image/webp';
 
-type UploadKind = 'bg' | 'transition' | 'scene-switch';
+type UploadKind = 'bg' | 'transition' | 'scene-switch' | 'voice' | 'bgm' | 'title-logo';
+type DeletableKind = 'bgm' | 'title-logo';
 
 function extOf(filename: string): string {
   const m = filename.toLowerCase().match(/\.([a-z0-9]+)$/);
@@ -504,20 +521,33 @@ function extOf(filename: string): string {
 
 async function uploadAsset(
   kind: UploadKind,
-  sceneId: string,
-  frameId: string,
   file: File,
-  extra?: { swIndex?: number },
+  opts: { sceneId?: string; frameId?: string; swIndex?: number; maleLineNumber?: number },
 ): Promise<UploadStatus> {
   const ext = extOf(file.name);
   const allowed =
-    kind === 'bg' ? BG_EXTS : kind === 'transition' ? TRANSITION_EXTS : SCENE_SWITCH_EXTS;
+    kind === 'bg'
+      ? BG_EXTS
+      : kind === 'transition'
+        ? TRANSITION_EXTS
+        : kind === 'voice'
+          ? VOICE_EXTS
+          : kind === 'bgm'
+            ? BGM_EXTS
+            : kind === 'title-logo'
+              ? ['png', 'jpg', 'jpeg', 'webp']
+              : SCENE_SWITCH_EXTS;
   if (!allowed.includes(ext === 'jpeg' ? 'jpeg' : ext)) {
     return { state: 'err', message: `不支持的扩展名 .${ext}（允许: ${allowed.join(', ')}）` };
   }
-  const params = new URLSearchParams({ kind, sceneId, frameId, ext });
-  if (kind === 'scene-switch' && extra?.swIndex != null) {
-    params.set('swIndex', String(extra.swIndex));
+  const params = new URLSearchParams({ kind, ext });
+  if (opts.sceneId) params.set('sceneId', opts.sceneId);
+  if (opts.frameId) params.set('frameId', opts.frameId);
+  if (kind === 'scene-switch' && opts.swIndex != null) {
+    params.set('swIndex', String(opts.swIndex));
+  }
+  if (kind === 'voice' && opts.maleLineNumber != null) {
+    params.set('maleLineNumber', String(opts.maleLineNumber));
   }
   try {
     const buf = await file.arrayBuffer();
@@ -544,6 +574,24 @@ async function uploadAsset(
     return { state: 'err', message: data.error ?? `HTTP ${res.status}` };
   } catch (e) {
     return { state: 'err', message: String(e) };
+  }
+}
+
+async function deleteAsset(
+  kind: DeletableKind,
+  sceneId?: string,
+): Promise<{ ok: boolean; deleted: string[]; message?: string }> {
+  const params = new URLSearchParams({ kind });
+  if (sceneId) params.set('sceneId', sceneId);
+  try {
+    const res = await fetch(`/dev/delete-asset?${params.toString()}`, { method: 'DELETE' });
+    const data = (await res.json()) as { ok?: boolean; deleted?: string[]; error?: string };
+    if (res.ok && data.ok) {
+      return { ok: true, deleted: data.deleted ?? [] };
+    }
+    return { ok: false, deleted: [], message: data.error ?? `HTTP ${res.status}` };
+  } catch (e) {
+    return { ok: false, deleted: [], message: String(e) };
   }
 }
 
@@ -603,18 +651,25 @@ function UploadSlot({
   sceneId,
   frameId,
   swIndex,
+  maleLineNumber,
   targetName: explicitTargetName,
+  deletable = false,
+  onDeleted,
 }: {
   kind: UploadKind;
   label: string;
   hint: string;
   accept: string;
-  sceneId: string;
-  frameId: string;
+  sceneId?: string;
+  frameId?: string;
   /** Required when kind === 'scene-switch'. */
   swIndex?: number;
+  /** Required when kind === 'voice'. */
+  maleLineNumber?: number;
   /** Optional override; otherwise computed from sceneId/frameId/(swIndex). */
   targetName?: string;
+  deletable?: boolean;
+  onDeleted?: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<UploadStatus>({ state: 'idle' });
@@ -623,7 +678,7 @@ function UploadSlot({
   // Reset status when frame/scene/index changes.
   useEffect(() => {
     setStatus({ state: 'idle' });
-  }, [sceneId, frameId, swIndex]);
+  }, [sceneId, frameId, swIndex, maleLineNumber]);
 
   const handlePick = () => {
     inputRef.current?.click();
@@ -634,22 +689,44 @@ function UploadSlot({
     e.target.value = ''; // allow re-picking the same file later
     if (!file) return;
     setStatus({ state: 'uploading' });
-    const result = await uploadAsset(kind, sceneId, frameId, file, { swIndex });
+    const result = await uploadAsset(kind, file, { sceneId, frameId, swIndex, maleLineNumber });
     setStatus(result);
     if (result.state === 'ok') {
       bumpAssetRefresh();
     }
   };
 
+  const handleDelete = async () => {
+    if (kind !== 'bgm' && kind !== 'title-logo') return;
+    if (!window.confirm(`确定删除「${label}」的音频/图片文件？`)) return;
+    setStatus({ state: 'uploading' });
+    const result = await deleteAsset(kind, sceneId);
+    if (result.ok) {
+      setStatus({ state: 'idle' });
+      bumpAssetRefresh();
+      onDeleted?.();
+    } else {
+      setStatus({ state: 'err', message: result.message ?? '删除失败' });
+    }
+  };
+
   const stem =
-    kind === 'scene-switch' && swIndex != null
-      ? `${sceneId}-${frameId}-sw${swIndex}`
-      : `${sceneId}-${frameId}`;
+    kind === 'title-logo'
+      ? 'title-logo'
+      : kind === 'bgm' && sceneId
+        ? sceneId
+        : kind === 'scene-switch' && swIndex != null && sceneId && frameId
+          ? `${sceneId}-${frameId}-sw${swIndex}`
+          : kind === 'voice' && maleLineNumber != null && sceneId && frameId
+            ? `${sceneId}-${frameId}-d${maleLineNumber}`
+            : sceneId && frameId
+              ? `${sceneId}-${frameId}`
+              : '—';
   const targetName =
     explicitTargetName ??
     `${stem}.{${accept
       .split(',')
-      .map((a) => a.split('/')[1])
+      .map((a) => a.split('/')[1] ?? a.replace(/^\./, ''))
       .join('|')}}`;
 
   return (
@@ -667,6 +744,16 @@ function UploadSlot({
         >
           {status.state === 'uploading' ? '上传中…' : '选择文件并上传'}
         </button>
+        {deletable && (
+          <button
+            type="button"
+            className={styles.uploadDeleteBtn}
+            onClick={handleDelete}
+            disabled={status.state === 'uploading'}
+          >
+            删除
+          </button>
+        )}
         <input
           ref={inputRef}
           type="file"
@@ -689,6 +776,58 @@ function UploadSlot({
         <div className={styles.uploadStatusErr}>✕ {status.message}</div>
       )}
     </div>
+  );
+}
+
+function BgmUploadSection() {
+  const script = useGame((s) => s.script);
+  const entries = useMemo(
+    () => [
+      { id: TITLE_BGM_SCENE_ID, title: '首页' },
+      ...script.sceneOrder.map((id) => ({
+        id,
+        title: script.scenes.get(id)?.title ?? id,
+      })),
+    ],
+    [script],
+  );
+
+  return (
+    <section className={styles.section}>
+      <div className={styles.sectionTitle}>背景音乐（按幕）</div>
+      <div className={styles.uploadHint}>
+        保存至 <code>public/assets/audio/bgm/{'{幕ID}'}.mp3</code>。进入该幕时若有文件则切换；
+        否则继续循环上一首。首页使用 <code>{TITLE_BGM_SCENE_ID}</code>。
+      </div>
+      {entries.map((ch) => (
+        <UploadSlot
+          key={ch.id}
+          kind="bgm"
+          label={ch.id === TITLE_BGM_SCENE_ID ? `首页 · ${ch.title}` : `${ch.id} · ${ch.title}`}
+          hint="支持 mp3 / ogg / m4a。上传会覆盖同幕其它扩展名；可点删除清空。"
+          accept={BGM_ACCEPT}
+          sceneId={ch.id}
+          targetName={`audio/bgm/${ch.id}.{mp3|ogg|m4a}`}
+          deletable
+        />
+      ))}
+    </section>
+  );
+}
+
+function TitleLogoUploadSection() {
+  return (
+    <section className={styles.section}>
+      <div className={styles.sectionTitle}>首页标题图</div>
+      <UploadSlot
+        kind="title-logo"
+        label="想见你 标题 LOGO"
+        hint="支持 png / jpg / webp。建议使用透明底 PNG；若为浅色底图，引擎会自动抠除浅色背景。"
+        accept={TITLE_LOGO_ACCEPT}
+        targetName="ui/title-logo.{png|webp|jpg}"
+        deletable
+      />
+    </section>
   );
 }
 
@@ -762,5 +901,146 @@ function AssetUploadSection({
         </section>
       )}
     </>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ *  男主台词配音上传（当前画面）
+ * ──────────────────────────────────────────────────────────────────────── */
+
+type MaleLineEntry = {
+  maleLineNumber: number;
+  preview: string;
+  action?: string;
+};
+
+function isMaleSpeaker(speaker: string): boolean {
+  return speaker === '他' || speaker === '陌生访客' || speaker === '男主';
+}
+
+function collectMaleDialogueLines(
+  frame: Frame | null,
+  chosenLetter: string | undefined,
+  chosenOptionByFrame: Record<string, string>,
+  sceneId: string | null,
+): MaleLineEntry[] {
+  if (!frame) return [];
+  const items = getEffectiveItems(
+    frame,
+    chosenLetter,
+    chosenOptionByFrame,
+    sceneId ?? undefined,
+  );
+  const out: MaleLineEntry[] = [];
+  let counter = 0;
+  for (const it of items) {
+    if (it.kind === 'line' && isMaleSpeaker(it.speaker)) {
+      counter += 1;
+      const raw = it.text.replace(/\s+/g, ' ').trim();
+      const preview = raw.length > 36 ? `${raw.slice(0, 36)}…` : raw;
+      out.push({ maleLineNumber: counter, preview, action: it.action });
+    }
+  }
+  return out;
+}
+
+function MaleVoiceUploadSection({
+  sceneId,
+  frameId,
+}: {
+  sceneId: string | null;
+  frameId: string | null;
+}) {
+  const script = useGame((s) => s.script);
+  const chosenOptionByFrame = useGame((s) => s.chosenOptionByFrame);
+  const chosenLetter =
+    sceneId && frameId ? chosenOptionByFrame[`${sceneId}/${frameId}`] : undefined;
+
+  const frame = useMemo<Frame | null>(() => {
+    if (!sceneId || !frameId) return null;
+    const scene = script.scenes.get(sceneId);
+    return scene?.frames.find((f) => f.id === frameId) ?? null;
+  }, [sceneId, frameId, script]);
+
+  const maleLines = useMemo(
+    () => collectMaleDialogueLines(frame, chosenLetter, chosenOptionByFrame, sceneId),
+    [frame, chosenLetter, chosenOptionByFrame, sceneId],
+  );
+
+  const [selectedLine, setSelectedLine] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (maleLines.length === 0) {
+      setSelectedLine(null);
+      return;
+    }
+    setSelectedLine((prev) => {
+      if (prev != null && maleLines.some((l) => l.maleLineNumber === prev)) return prev;
+      return maleLines[0].maleLineNumber;
+    });
+  }, [maleLines]);
+
+  if (!sceneId || !frameId) {
+    return (
+      <section className={styles.section}>
+        <div className={styles.sectionTitle}>男主台词配音</div>
+        <div className={styles.muted}>未选中画面，无法配置配音。</div>
+      </section>
+    );
+  }
+
+  if (maleLines.length === 0) {
+    return (
+      <section className={styles.section}>
+        <div className={styles.sectionTitle}>男主台词配音</div>
+        <div className={styles.muted}>本画面暂无男主台词。</div>
+      </section>
+    );
+  }
+
+  const current = maleLines.find((l) => l.maleLineNumber === selectedLine) ?? maleLines[0];
+
+  return (
+    <section className={styles.section}>
+      <div className={styles.sectionTitle}>男主台词配音</div>
+      <div className={styles.uploadHint}>
+        播放到对应台词时自动播放；快速点掉该句会停止。文件命名：
+        <code>{sceneId}-{frameId}-d{'{N}'}.mp3</code>
+      </div>
+      {chosenLetter && (
+        <div className={styles.uploadHint}>
+          当前已选分支 <code>{chosenLetter}</code>，列表按该分支内的男主台词编号。
+        </div>
+      )}
+      <div className={styles.txRow}>
+        <label className={styles.txLabel}>台词</label>
+        <select
+          className={styles.txSelect}
+          value={selectedLine ?? current.maleLineNumber}
+          onChange={(e) => setSelectedLine(Number(e.target.value))}
+        >
+          {maleLines.map((line) => (
+            <option key={line.maleLineNumber} value={line.maleLineNumber}>
+              d{line.maleLineNumber} · {line.preview}
+            </option>
+          ))}
+        </select>
+      </div>
+      {current.action && (
+        <div className={styles.uploadHint}>
+          动作：（{current.action}）
+        </div>
+      )}
+      <UploadSlot
+        kind="voice"
+        label={`第 ${current.maleLineNumber} 句 · ${current.preview}`}
+        hint="支持 mp3 / ogg / m4a / wav。上传后播放到该句时自动播放。"
+        accept={VOICE_ACCEPT}
+        sceneId={sceneId}
+        frameId={frameId}
+        maleLineNumber={current.maleLineNumber}
+        targetName={`${sceneId}-${frameId}-d${current.maleLineNumber}.{mp3|ogg|m4a|wav}`}
+      />
+    </section>
   );
 }

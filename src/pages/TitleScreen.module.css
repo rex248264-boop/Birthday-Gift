@@ -1,6 +1,7 @@
 .root {
   position: absolute;
   inset: 0;
+  z-index: 10;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -79,9 +80,13 @@
   width: min(88vw, 360px);
   height: auto;
   user-select: none;
-  mix-blend-mode: screen;
   filter: drop-shadow(0 0 24px rgba(255, 200, 120, 0.25));
   animation: logoFadeIn 1.2s ease both;
+}
+
+.titleLogoPlaceholder {
+  width: min(88vw, 360px);
+  height: clamp(80px, 22vw, 140px);
 }
 
 @keyframes logoFadeIn {
@@ -153,4 +158,124 @@
 
 .footerHint {
   color: rgba(255, 215, 165, 0.5);
+}
+
+/* ── Continue / chapter picker ───────────────────────────────── */
+.continueOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(4, 2, 8, 0.72);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.continuePanel {
+  width: min(92vw, 340px);
+  max-height: min(70vh, 520px);
+  overflow-y: auto;
+  padding: 18px 16px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 215, 165, 0.28);
+  background: rgba(12, 8, 18, 0.96);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+}
+
+.continueTitle {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  letter-spacing: 0.12em;
+  color: rgba(255, 215, 165, 0.85);
+  margin-bottom: 14px;
+  text-align: center;
+}
+
+.continueResumeBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  padding: 14px 12px;
+  margin-bottom: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 215, 165, 0.35);
+  background: rgba(255, 215, 165, 0.1);
+  color: rgba(255, 245, 230, 0.95);
+  font-family: var(--font-serif);
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  text-align: left;
+}
+
+.continueResumeMeta {
+  font-size: 12px;
+  color: rgba(255, 215, 165, 0.55);
+  letter-spacing: 0.04em;
+}
+
+.continueDivider {
+  font-size: 11px;
+  color: rgba(255, 215, 165, 0.45);
+  text-align: center;
+  margin: 8px 0 12px;
+  letter-spacing: 0.1em;
+}
+
+.chapterList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.chapterBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 215, 165, 0.18);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 240, 220, 0.92);
+  font-family: var(--font-serif);
+  cursor: pointer;
+  text-align: left;
+}
+
+.chapterBtn:active {
+  background: rgba(255, 215, 165, 0.08);
+}
+
+.chapterId {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: rgba(255, 215, 165, 0.6);
+}
+
+.chapterTitle {
+  font-size: 14px;
+  letter-spacing: 0.05em;
+  line-height: 1.4;
+}
+
+.continueCloseBtn {
+  width: 100%;
+  margin-top: 12px;
+  padding: 12px;
+  border: none;
+  background: none;
+  color: rgba(255, 215, 165, 0.55);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  cursor: pointer;
 }

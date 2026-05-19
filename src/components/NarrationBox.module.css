@@ -37,11 +37,11 @@
 }
 
 .line {
-  margin: 0 0 4px 0;
+  margin: 0 0 2px 0;
   font-family: var(--font-serif);
   color: var(--ink-soft);
   font-size: var(--fs-md);
-  line-height: 1.7;
+  line-height: 1.45;
   letter-spacing: 0.08em;
   font-style: italic;
   font-weight: 400;

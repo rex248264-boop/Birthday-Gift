@@ -27,7 +27,10 @@ function rawMarkdownPlugin() {
 // transition file into public/assets/, named by the current scene/frame.
 //
 // Request:
-//   POST /dev/upload-asset?kind=bg|transition&sceneId=S01&frameId=1.3&ext=mp4
+//   POST /dev/upload-asset?kind=bg|transition|voice|bgm|title-logo&sceneId=S01&frameId=1.3&ext=mp4
+//   bgm: 仅需 sceneId（首页用 __title__）；title-logo: 无需 sceneId/frameId
+//   DELETE /dev/delete-asset?kind=bgm|title-logo&sceneId=__title__  （删除该 stem 全部扩展名）
+//   voice 额外需要 maleLineNumber（本帧内男主台词序号，从 1 起）
 //   Body: raw binary bytes of the file (octet-stream)
 //
 // Behaviour:
@@ -38,13 +41,20 @@ function rawMarkdownPlugin() {
 //   - Writes the new file to:
 //       bg          → public/assets/bg/{sceneId}-{frameId}.{ext}
 //       transition  → public/assets/transitions/{sceneId}-{frameId}.{ext}
+//       voice       → public/assets/audio/voice/he/{sceneId}-{frameId}-d{N}.{ext}
 function uploadAssetPlugin() {
   const ALLOWED_BG_EXTS = new Set(['png', 'jpg', 'jpeg', 'webp', 'mp4', 'webm']);
   const ALLOWED_TRANSITION_EXTS = new Set(['mp4', 'webm']);
   const ALLOWED_SCENE_SWITCH_EXTS = new Set(['png', 'jpg', 'jpeg', 'webp']);
+  const ALLOWED_VOICE_EXTS = new Set(['mp3', 'ogg', 'm4a', 'wav']);
+  const ALLOWED_BGM_EXTS = new Set(['mp3', 'ogg', 'm4a']);
+  const ALLOWED_TITLE_LOGO_EXTS = new Set(['png', 'jpg', 'jpeg', 'webp']);
   const ALL_BG_EXTS = ['png', 'jpg', 'jpeg', 'webp', 'mp4', 'webm'];
   const ALL_TRANSITION_EXTS = ['mp4', 'webm'];
   const ALL_SCENE_SWITCH_EXTS = ['png', 'jpg', 'jpeg', 'webp'];
+  const ALL_VOICE_EXTS = ['mp3', 'ogg', 'm4a', 'wav'];
+  const ALL_BGM_EXTS = ['mp3', 'ogg', 'm4a'];
+  const ALL_TITLE_LOGO_EXTS = ['png', 'jpg', 'jpeg', 'webp'];
 
   return {
     name: 'upload-asset',
@@ -67,18 +77,40 @@ function uploadAssetPlugin() {
           const frameId = url.searchParams.get('frameId');
           const extRaw = (url.searchParams.get('ext') ?? '').toLowerCase().replace(/^\./, '');
           const swIndexRaw = url.searchParams.get('swIndex');
+          const maleLineNumberRaw = url.searchParams.get('maleLineNumber');
 
-          if (!sceneId || !frameId || !extRaw) {
+          if (!extRaw) {
             res.statusCode = 400;
             res.setHeader('Content-Type', 'application/json');
-            res.end(JSON.stringify({ error: 'Missing sceneId / frameId / ext' }));
+            res.end(JSON.stringify({ error: 'Missing ext' }));
             return;
           }
-          // Defensive: only allow safe characters in IDs (no path traversal).
-          if (!/^[A-Za-z0-9._-]+$/.test(sceneId) || !/^[A-Za-z0-9._-]+$/.test(frameId)) {
+
+          const needsFrame = kind === 'bg' || kind === 'transition' || kind === 'scene-switch' || kind === 'voice';
+          const needsScene = kind !== 'title-logo';
+
+          if (needsScene && !sceneId) {
             res.statusCode = 400;
             res.setHeader('Content-Type', 'application/json');
-            res.end(JSON.stringify({ error: 'Invalid sceneId / frameId' }));
+            res.end(JSON.stringify({ error: 'Missing sceneId' }));
+            return;
+          }
+          if (needsFrame && !frameId) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'Missing frameId' }));
+            return;
+          }
+          if (sceneId && !/^[A-Za-z0-9._-]+$/.test(sceneId)) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'Invalid sceneId' }));
+            return;
+          }
+          if (frameId && !/^[A-Za-z0-9._-]+$/.test(frameId)) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'Invalid frameId' }));
             return;
           }
 
@@ -122,6 +154,43 @@ function uploadAssetPlugin() {
             folder = 'scene-switches';
             allExtsToSweep = ALL_SCENE_SWITCH_EXTS;
             stem = `${sceneId}-${frameId}-sw${swIndex}`;
+          } else if (kind === 'voice') {
+            if (!ALLOWED_VOICE_EXTS.has(extRaw)) {
+              res.statusCode = 415;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: `voice 仅支持 mp3/ogg/m4a/wav，收到 ${extRaw}` }));
+              return;
+            }
+            const maleLineNumber = maleLineNumberRaw ? Number(maleLineNumberRaw) : NaN;
+            if (!Number.isInteger(maleLineNumber) || maleLineNumber < 1) {
+              res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: `voice 需要正整数 maleLineNumber，收到 ${maleLineNumberRaw}` }));
+              return;
+            }
+            folder = 'audio/voice/he';
+            allExtsToSweep = ALL_VOICE_EXTS;
+            stem = `${sceneId}-${frameId}-d${maleLineNumber}`;
+          } else if (kind === 'bgm') {
+            if (!ALLOWED_BGM_EXTS.has(extRaw)) {
+              res.statusCode = 415;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: `bgm 仅支持 mp3/ogg/m4a，收到 ${extRaw}` }));
+              return;
+            }
+            folder = 'audio/bgm';
+            allExtsToSweep = ALL_BGM_EXTS;
+            stem = sceneId!;
+          } else if (kind === 'title-logo') {
+            if (!ALLOWED_TITLE_LOGO_EXTS.has(extRaw)) {
+              res.statusCode = 415;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: `title-logo 仅支持 png/jpg/webp，收到 ${extRaw}` }));
+              return;
+            }
+            folder = 'ui';
+            allExtsToSweep = ALL_TITLE_LOGO_EXTS;
+            stem = 'title-logo';
           } else {
             res.statusCode = 400;
             res.setHeader('Content-Type', 'application/json');
@@ -170,6 +239,78 @@ function uploadAssetPlugin() {
               res.end(JSON.stringify({ error: String(e) }));
             }
           });
+        } catch (e) {
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: String(e) }));
+        }
+      });
+    },
+  };
+}
+
+function deleteAssetPlugin() {
+  const DELETABLE = new Set(['bgm', 'title-logo']);
+  const EXTS_BY_KIND: Record<string, string[]> = {
+    bgm: ['mp3', 'ogg', 'm4a'],
+    'title-logo': ['png', 'jpg', 'jpeg', 'webp'],
+  };
+
+  return {
+    name: 'delete-asset',
+    apply: 'serve' as const,
+    configureServer(server: {
+      middlewares: { use: (path: string, handler: (req: IncomingMessage, res: ServerResponse) => void) => void };
+      config: { root: string };
+    }) {
+      server.middlewares.use('/dev/delete-asset', (req, res) => {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        if (req.method !== 'DELETE') {
+          res.statusCode = 405;
+          res.end();
+          return;
+        }
+        try {
+          const url = new URL(req.url ?? '', 'http://x');
+          const kind = url.searchParams.get('kind');
+          const sceneId = url.searchParams.get('sceneId');
+
+          if (!kind || !DELETABLE.has(kind)) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: `不支持的 kind: ${kind}` }));
+            return;
+          }
+
+          let folder: string;
+          let stem: string;
+          if (kind === 'bgm') {
+            if (!sceneId || !/^[A-Za-z0-9._-]+$/.test(sceneId)) {
+              res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: 'bgm 需要合法 sceneId（首页用 __title__）' }));
+              return;
+            }
+            folder = 'audio/bgm';
+            stem = sceneId;
+          } else {
+            folder = 'ui';
+            stem = 'title-logo';
+          }
+
+          const dir = path.join(server.config.root, 'public', 'assets', folder);
+          const exts = EXTS_BY_KIND[kind] ?? [];
+          const deleted: string[] = [];
+          for (const e of exts) {
+            const fp = path.join(dir, `${stem}.${e}`);
+            if (fs.existsSync(fp)) {
+              fs.unlinkSync(fp);
+              deleted.push(`${stem}.${e}`);
+            }
+          }
+
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ ok: true, deleted }));
         } catch (e) {
           res.statusCode = 500;
           res.setHeader('Content-Type', 'application/json');
@@ -229,7 +370,7 @@ function patchTextPlugin() {
 }
 
 export default defineConfig({
-  plugins: [react(), rawMarkdownPlugin(), patchTextPlugin(), uploadAssetPlugin()],
+  plugins: [react(), rawMarkdownPlugin(), patchTextPlugin(), uploadAssetPlugin(), deleteAssetPlugin()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),

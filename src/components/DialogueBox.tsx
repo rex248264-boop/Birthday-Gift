@@ -4,7 +4,7 @@ import type { DialogueLine } from '@/parser';
 import styles from './DialogueBox.module.css';
 import { audio } from '@/audio/audioManager';
 import { resolveCharacter } from '@/config/characters';
-import { useTextOffsetStyle } from '@/engine';
+import { useGame, useTextOffsetStyle } from '@/engine';
 
 type Props = {
   line: DialogueLine;
@@ -17,6 +17,7 @@ type Props = {
 const CHARS_PER_SECOND = 36;
 
 export function DialogueBox({ line, sceneId, frameId, maleLineNumber, onComplete }: Props) {
+  const assetNonce = useGame((s) => s.assetRefreshNonce);
   const text = line.text;
   const [shown, setShown] = useState('');
   const isHe = line.speaker === '他' || line.speaker === '陌生访客' || line.speaker === '男主';
@@ -47,9 +48,9 @@ export function DialogueBox({ line, sceneId, frameId, maleLineNumber, onComplete
 
   useEffect(() => {
     if (!isHe) return;
-    audio.playVoice(sceneId, frameId, maleLineNumber, line.hints.voice);
+    audio.playVoice(sceneId, frameId, maleLineNumber, line.hints.voice, assetNonce || undefined);
     return () => audio.stopVoice();
-  }, [isHe, sceneId, frameId, maleLineNumber, line.hints.voice]);
+  }, [isHe, sceneId, frameId, maleLineNumber, line.hints.voice, assetNonce]);
 
   const skipReveal = () => {
     if (!completedRef.current && text.length > 0) {

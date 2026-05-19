@@ -549,6 +549,26 @@
   cursor: default;
 }
 
+.uploadDeleteBtn {
+  font-family: inherit;
+  font-size: 11px;
+  padding: 5px 12px;
+  background: rgba(220, 80, 80, 0.12);
+  border: 1px solid rgba(220, 100, 100, 0.45);
+  border-radius: 6px;
+  color: rgba(255, 180, 180, 0.92);
+  cursor: pointer;
+}
+
+.uploadDeleteBtn:hover:not(:disabled) {
+  background: rgba(220, 80, 80, 0.22);
+}
+
+.uploadDeleteBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .uploadStatusOk {
   margin-top: 8px;
   padding: 6px 8px;

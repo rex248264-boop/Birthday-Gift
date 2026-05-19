@@ -129,9 +129,10 @@ export function useTextOffsetStyle(slot: TextSlotKey): CSSProperties | undefined
 
 /** 读当前场景标题推导主题；脱离 playing 阶段时回退到 universal。 */
 export function useCurrentTheme(): SceneTheme {
+  const phase = useGame((s) => s.phase);
   const currentSceneId = useGame((s) => s.currentSceneId);
   const script = useGame((s) => s.script);
-  if (!currentSceneId) return 'universal';
+  if (phase !== 'playing' || !currentSceneId) return 'universal';
   const title = script.scenes.get(currentSceneId)?.title;
   return getSceneTheme(title);
 }

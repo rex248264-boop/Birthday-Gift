@@ -11,7 +11,6 @@ import { TextInputBox } from './TextInputBox';
 import { Transition } from './Transition';
 import { VideoTransition } from './VideoTransition';
 import { TopBar } from './TopBar';
-import { BottomControls } from './BottomControls';
 import { useGame } from '@/engine';
 import {
   resolveTransitionVideo,
@@ -139,11 +138,22 @@ export function FrameView({ sceneId, frame }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentItem, sceneSwitchUrls]);
 
+  const scene = currentScene();
+
+  // 幕级 BGM：进入新幕时尝试切换；若无文件则延续上一首。
   useEffect(() => {
     if (!audioUnlocked) return;
-    const bgmHint = frame.description?.hints.bgm ?? frame.dialogue?.hints.bgm;
-    audio.playBGM(sceneId, bgmHint);
-  }, [sceneId, frame.id, audioUnlocked]);
+    const sceneBgm = scene?.hints.bgm;
+    void audio.playBGM(sceneId, sceneBgm);
+  }, [sceneId, audioUnlocked, scene?.hints.bgm]);
+
+  // 画面级 BGM 提示（可选）：仅当本帧写了 bgm hint 时才尝试覆盖。
+  useEffect(() => {
+    if (!audioUnlocked) return;
+    const frameBgm = frame.description?.hints.bgm ?? frame.dialogue?.hints.bgm;
+    if (!frameBgm) return;
+    void audio.playBGM(sceneId, frameBgm);
+  }, [sceneId, frame.id, audioUnlocked, frame.description?.hints.bgm, frame.dialogue?.hints.bgm]);
 
   useEffect(() => {
     if (!audioUnlocked) return;
@@ -229,7 +239,6 @@ export function FrameView({ sceneId, frame }: Props) {
     | 'center' | 'center-top' | 'center-bottom' | 'left' | 'right' | 'full'
     | undefined) ?? 'center';
 
-  const scene = currentScene();
   const sceneTitle = scene?.title;
 
   return (
@@ -260,7 +269,6 @@ export function FrameView({ sceneId, frame }: Props) {
       )}
 
       {!isInteractive && <TopBar contextLabel={sceneTitle} />}
-      {!isInteractive && <BottomControls />}
 
       {currentItem && currentItem.kind === 'line' && (
         <DialogueBox

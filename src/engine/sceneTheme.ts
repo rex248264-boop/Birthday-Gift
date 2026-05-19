@@ -13,5 +13,6 @@ export function getSceneTheme(sceneTitle: string | undefined): SceneTheme {
   if (!sceneTitle) return 'universal';
   if (sceneTitle.includes('赛博')) return 'cyber';
   if (sceneTitle.includes('民国')) return 'minguo';
+  // 现实 / 序章 / 终章 等使用默认（现实）UI 资源
   return 'universal';
 }

@@ -5,7 +5,10 @@ import { loadAllScripts } from '@/parser';
 
 export type Flags = Record<string, number | string | boolean>;
 
-export type AppPhase = 'title' | 'playing' | 'ending';
+export type AppPhase = 'title' | 'playing' | 'gameover' | 'ending';
+
+/** 段落 BE：播完本场后展示「游戏结束」，不进入下游场次 */
+export const BRANCH_GAME_OVER_SCENES = new Set(['S06B', 'S13B']);
 
 export type FontScale = 'sm' | 'md' | 'lg';
 
@@ -30,6 +33,13 @@ export interface GameState {
    */
   chosenOptionByFrame: Record<string, string>;
 
+  /** 已通关（完整播完）的场次，用于首页章节重玩 */
+  clearedScenes: string[];
+  /** 段落 BE 结局后不再提供「从当前进度继续」 */
+  canResumeFromSave: boolean;
+  /** 最近一次结局来源场次（如 S06B / S13B / S14） */
+  endingSceneId: string | null;
+
   devMode: boolean;
   showDevPanel: boolean;
   audioUnlocked: boolean;
@@ -43,9 +53,12 @@ export interface GameState {
   assetRefreshNonce: number;
 
   setPhase: (p: AppPhase) => void;
+  goToTitle: () => void;
   setFontScale: (scale: FontScale) => void;
   startNewGame: (sceneId?: string) => void;
+  replayChapter: (sceneId: string) => void;
   jumpTo: (sceneId: string, frameId?: string) => void;
+  markSceneCleared: (sceneId: string) => void;
   advance: () => void;
   setDialogueIdx: (i: number) => void;
   setFlag: (key: string, value: number | string | boolean) => void;
@@ -78,6 +91,10 @@ export const useGame = create<GameState>()(
       history: [],
       chosenOptionByFrame: {},
 
+      clearedScenes: [],
+      canResumeFromSave: false,
+      endingSceneId: null,
+
       devMode: import.meta.env.DEV,
       showDevPanel: false,
       audioUnlocked: false,
@@ -85,6 +102,13 @@ export const useGame = create<GameState>()(
       assetRefreshNonce: 0,
 
       setPhase: (p) => set({ phase: p }),
+
+      goToTitle: () =>
+        set({
+          phase: 'title',
+          endingSceneId: null,
+        }),
+
       setFontScale: (scale) => set({ fontScale: scale }),
 
       startNewGame: (sceneId) => {
@@ -99,7 +123,30 @@ export const useGame = create<GameState>()(
           flags: {},
           history: firstFrame ? [{ sceneId: id, frameId: firstFrame.id }] : [],
           chosenOptionByFrame: {},
+          canResumeFromSave: true,
+          endingSceneId: null,
         });
+      },
+
+      markSceneCleared: (sceneId) => {
+        const id = sceneId.toUpperCase();
+        set((s) => {
+          if (s.clearedScenes.includes(id)) return s;
+          return { clearedScenes: [...s.clearedScenes, id] };
+        });
+      },
+
+      replayChapter: (sceneId) => {
+        const id = sceneId.toUpperCase();
+        set((s) => {
+          const nextChosen = { ...s.chosenOptionByFrame };
+          const prefix = `${id}/`;
+          for (const key of Object.keys(nextChosen)) {
+            if (key.startsWith(prefix)) delete nextChosen[key];
+          }
+          return { chosenOptionByFrame: nextChosen };
+        });
+        get().jumpTo(id);
       },
 
       jumpTo: (sceneId, frameId) => {
@@ -124,6 +171,8 @@ export const useGame = create<GameState>()(
             currentDialogueIdx: 0,
             history: [...s.history, { sceneId: scene.id, frameId: frame.id }],
             chosenOptionByFrame: nextChosen,
+            canResumeFromSave: true,
+            endingSceneId: null,
           };
         });
       },
@@ -160,6 +209,18 @@ export const useGame = create<GameState>()(
             history: [...s.history, { sceneId: scene.id, frameId: next.id }],
           }));
         } else {
+          get().markSceneCleared(scene.id);
+
+          // 段落 BE：播完展示「游戏结束」，不进入 S07 / S14 等下游
+          if (BRANCH_GAME_OVER_SCENES.has(scene.id)) {
+            set({
+              phase: 'gameover',
+              endingSceneId: scene.id,
+              canResumeFromSave: false,
+            });
+            return;
+          }
+
           // End of scene: S14 has a conditional hidden route to S15 (true ending)
           // only unlocked when the player completed both S06A and S13A good paths.
           if (scene.id === 'S14') {
@@ -169,7 +230,7 @@ export const useGame = create<GameState>()(
             if (visitedS06A && visitedS13A && script.scenes.has('S15')) {
               get().jumpTo('S15');
             } else {
-              set({ phase: 'ending' });
+              set({ phase: 'ending', endingSceneId: 'S14', canResumeFromSave: false });
             }
             return;
           }
@@ -181,7 +242,7 @@ export const useGame = create<GameState>()(
           if (nextSceneId && script.scenes.has(nextSceneId)) {
             get().jumpTo(nextSceneId);
           } else {
-            set({ phase: 'ending' });
+            set({ phase: 'ending', endingSceneId: scene.id, canResumeFromSave: false });
           }
         }
       },
@@ -233,8 +294,22 @@ export const useGame = create<GameState>()(
         currentDialogueIdx: s.currentDialogueIdx,
         phase: s.phase,
         chosenOptionByFrame: s.chosenOptionByFrame,
+        clearedScenes: s.clearedScenes,
+        canResumeFromSave: s.canResumeFromSave,
+        endingSceneId: s.endingSceneId,
         fontScale: s.fontScale,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        // 旧存档：S06B/S13B 误存为 ending → 纠正为 gameover
+        if (
+          state.phase === 'ending' &&
+          state.endingSceneId &&
+          BRANCH_GAME_OVER_SCENES.has(state.endingSceneId.toUpperCase())
+        ) {
+          state.phase = 'gameover';
+        }
+      },
     },
   ),
 );

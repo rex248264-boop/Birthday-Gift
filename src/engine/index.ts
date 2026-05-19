@@ -1,5 +1,6 @@
 export { useGame } from './store';
-export type { FontScale } from './store';
+export type { AppPhase, FontScale } from './store';
+export { BRANCH_GAME_OVER_SCENES } from './store';
 export {
   tapAdvance,
   chooseOption,

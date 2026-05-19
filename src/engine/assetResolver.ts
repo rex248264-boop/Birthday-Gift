@@ -14,6 +14,11 @@ const SPRITE_EXTS = ['png', 'webp', 'jpg'];
 const EFFECT_EXTS = ['webm', 'mp4'];
 const AUDIO_EXTS = ['mp3', 'ogg', 'm4a'];
 
+/** 首页标题 BGM 的文件名 stem（public/assets/audio/bgm/__title__.mp3） */
+export const TITLE_BGM_SCENE_ID = '__title__';
+
+const TITLE_LOGO_EXTS = ['png', 'webp', 'jpg', 'jpeg'];
+
 // Until each frame has a dedicated background, the entire game falls back to
 // this video as a placeholder. Replace later by dropping per-frame files into
 // /assets/bg/{SceneId}-{FrameId}.{jpg|png|webp|mp4|webm}.
@@ -47,6 +52,10 @@ export function resolveBGM(sceneId: string, hint?: string): string[] {
     return [hint.includes('/') ? withBase(hint) : withBase(joinUrl('assets', 'audio', 'bgm', hint))];
   }
   return autoExt(joinUrl('/assets/audio/bgm', sceneId), AUDIO_EXTS);
+}
+
+export function resolveTitleLogo(): string[] {
+  return autoExt(joinUrl('/assets/ui', 'title-logo'), TITLE_LOGO_EXTS);
 }
 
 export function resolveSFX(hint: string): string {
