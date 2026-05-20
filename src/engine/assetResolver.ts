@@ -12,10 +12,12 @@ const BG_IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'webp'];
 const BG_VIDEO_EXTS = ['mp4', 'webm'];
 const SPRITE_EXTS = ['png', 'webp', 'jpg'];
 const EFFECT_EXTS = ['webm', 'mp4'];
-const AUDIO_EXTS = ['mp3', 'ogg', 'm4a'];
+const AUDIO_EXTS = ['mp3', 'ogg', 'm4a', 'wav'];
 
 /** 首页标题 BGM 的文件名 stem（public/assets/audio/bgm/__title__.mp3） */
 export const TITLE_BGM_SCENE_ID = '__title__';
+export const S11_BLUE_DOT_SPECIAL_AUDIO_STEM = 'S11-11.4-blue-dot';
+export const FINAL_SLIDESHOW_DIR = '/assets/final-slideshow';
 
 const TITLE_LOGO_EXTS = ['png', 'webp', 'jpg', 'jpeg'];
 
@@ -54,6 +56,13 @@ export function resolveBGM(sceneId: string, hint?: string): string[] {
   return autoExt(joinUrl('/assets/audio/bgm', sceneId), AUDIO_EXTS);
 }
 
+export function resolveFrameBGM(sceneId: string, frameId: string, hint?: string): string[] {
+  if (hint) {
+    return [hint.includes('/') ? withBase(hint) : withBase(joinUrl('assets', 'audio', 'bgm', hint))];
+  }
+  return autoExt(joinUrl('/assets/audio/bgm', `${sceneId}-${frameId}`), AUDIO_EXTS);
+}
+
 export function resolveTitleLogo(): string[] {
   return autoExt(joinUrl('/assets/ui', 'title-logo'), TITLE_LOGO_EXTS);
 }
@@ -63,11 +72,29 @@ export function resolveSFX(hint: string): string {
   return hint.includes('/') ? withBase(hint) : withBase(joinUrl('assets', 'audio', 'sfx', hint));
 }
 
-export function resolveVoice(sceneId: string, frameId: string, maleLineNumber: number, hint?: string): string[] {
+export function resolveVoice(
+  sceneId: string,
+  frameId: string,
+  maleLineNumber: number,
+  hint?: string,
+  voiceKey?: string,
+): string[] {
   if (hint) {
     return [hint.includes('/') ? withBase(hint) : withBase(joinUrl('assets', 'audio', 'voice', 'he', hint))];
   }
+  if (voiceKey) {
+    return autoExt(joinUrl('/assets/audio/voice/he', `${sceneId}-${frameId}-${voiceKey}`), AUDIO_EXTS);
+  }
   return autoExt(joinUrl('/assets/audio/voice/he', `${sceneId}-${frameId}-d${maleLineNumber}`), AUDIO_EXTS);
+}
+
+export function resolveS11BlueDotSpecialAudio(): string[] {
+  return autoExt(joinUrl('/assets/audio/special', S11_BLUE_DOT_SPECIAL_AUDIO_STEM), AUDIO_EXTS);
+}
+
+export function resolveFinalSlideshowImage(index: number): string[] {
+  const padded = String(index).padStart(2, '0');
+  return autoExt(joinUrl(FINAL_SLIDESHOW_DIR, padded), BG_IMAGE_EXTS);
 }
 
 // Resolves a *spot* micro-effect overlaid on a still scene (e.g. golden particles,

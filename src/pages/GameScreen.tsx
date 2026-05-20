@@ -1,6 +1,7 @@
 import { useGame } from '@/engine';
 import { currentFrame } from '@/engine';
 import { FrameView } from '@/components/FrameView';
+import { FinalLetterExperience } from '@/components/FinalLetterExperience';
 import styles from './GameScreen.module.css';
 
 export function GameScreen() {
@@ -19,6 +20,10 @@ export function GameScreen() {
         </button>
       </div>
     );
+  }
+
+  if (currentSceneId === 'S15') {
+    return <FinalLetterExperience />;
   }
 
   const frame = currentFrame();

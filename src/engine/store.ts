@@ -35,7 +35,7 @@ export interface GameState {
 
   /** 已通关（完整播完）的场次，用于首页章节重玩 */
   clearedScenes: string[];
-  /** 段落 BE 结局后不再提供「从当前进度继续」 */
+  /** 是否允许标题页展示「从当前进度继续」 */
   canResumeFromSave: boolean;
   /** 最近一次结局来源场次（如 S06B / S13B / S14） */
   endingSceneId: string | null;
@@ -161,8 +161,13 @@ export const useGame = create<GameState>()(
         if (!frame) return;
         const targetKey = `${scene.id}/${frame.id}`;
         set((s) => {
-          // 进入目标帧时清掉该帧上的旧选择记录，使重访时玩家可以重新选择
+          // 进入目标场景时清掉本场旧选择记录，使重访/调试跳转时玩家可以重新选择。
+          // 只清目标帧不够：S12 这类分叉在后续帧，旧选择会让 choice 被 branchLines 直接替换。
           const nextChosen = { ...s.chosenOptionByFrame };
+          const prefix = `${scene.id}/`;
+          for (const key of Object.keys(nextChosen)) {
+            if (key.startsWith(prefix)) delete nextChosen[key];
+          }
           delete nextChosen[targetKey];
           return {
             phase: 'playing',
@@ -193,6 +198,7 @@ export const useGame = create<GameState>()(
             if (item.kind === 'choice') {
               const opt = item.options.find((o) => o.letter === chosenLetter);
               if (opt?.targetSceneId) {
+                get().markSceneCleared(scene.id);
                 get().jumpTo(opt.targetSceneId, opt.targetFrameId);
                 return;
               }
@@ -211,23 +217,21 @@ export const useGame = create<GameState>()(
         } else {
           get().markSceneCleared(scene.id);
 
-          // 段落 BE：播完展示「游戏结束」，不进入 S07 / S14 等下游
+          // 段落 BE：播完展示「游戏结束」，不进入 S07 / S14 等下游；
+          // 但保留当前进度，方便玩家回到标题页后继续或重看。
           if (BRANCH_GAME_OVER_SCENES.has(scene.id)) {
             set({
               phase: 'gameover',
               endingSceneId: scene.id,
-              canResumeFromSave: false,
+              canResumeFromSave: true,
             });
             return;
           }
 
-          // End of scene: S14 has a conditional hidden route to S15 (true ending)
-          // only unlocked when the player completed both S06A and S13A good paths.
+          // End of scene: S14 now always flows into the final letter chapter.
+          // S15 owns the custom darkened-envelope reveal instead of the normal ending screen.
           if (scene.id === 'S14') {
-            const { history } = get();
-            const visitedS06A = history.some((h) => h.sceneId === 'S06A');
-            const visitedS13A = history.some((h) => h.sceneId === 'S13A');
-            if (visitedS06A && visitedS13A && script.scenes.has('S15')) {
+            if (script.scenes.has('S15')) {
               get().jumpTo('S15');
             } else {
               set({ phase: 'ending', endingSceneId: 'S14', canResumeFromSave: false });
